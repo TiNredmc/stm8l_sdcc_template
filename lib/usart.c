@@ -2,16 +2,21 @@
 #include "stm8l.h"
 
 void usart_init() {
-    /* round to nearest integer */
-    //uint16_t div = (F_CPU + BAUDRATE / 2) / BAUDRATE;
-uint16_t div = F_CPU / BAUDRATE;
-    /* madness.. */
-    //USART1_BRR2 = ((div >> 8) & 0xF0) + (div & 0x0F);
-	USART1_BRR2 = ((div >> 8) & 0xF0); 
-	USART1_BRR2 |= (div & 0x0F);
-    USART1_BRR1 = div >> 4;
+/*Set clock divider to 1, because the SDCC always set to 8 */
+CLK_CKDIVR = 0x00;
+/*Enable clock for USART1*/
+CLK_PCKENR1 |= (1 << (0x05 & 0x0F)); // enable USART1 clock.
+/* reset the baudrate setting */ 	
+	USART1_BRR2 = 0X0F; 
+	USART1_BRR2 = 0xF0;
+	USART1_BRR1 = 0xFF;
+/* set the baudrate */
+  uint32_t BaudRate_Mantissa = (uint32_t)(F_CPU / BAUDRATE);
+  USART1_BRR2 = (uint8_t)(BaudRate_Mantissa & 0x0F) | (uint8_t)(BaudRate_Mantissa & 0xF000);
+  USART1_BRR1 = (uint8_t)((BaudRate_Mantissa >> 4) & 0xFF);
     /* enable transmitter and receiver */
-    USART1_CR2 = (1 << USART1_CR2_TEN) | (1 << USART1_CR2_REN);
+    USART1_CR2 &= (0x00); //Disable it first then re-enable
+    USART1_CR2 |= 0x04 | 0x08;// add 1 to bit number 2 and 3 for enabling the Tx and Rx
 }
 
 void usart_write(uint8_t data) {
