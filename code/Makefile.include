@@ -3,7 +3,7 @@ export PATH := $(PATH):$(HOME)/local/sdcc/bin
 MCU  = stm8l151?3
 ARCH = stm8
 
-F_CPU   ?= 2000000
+F_CPU   ?= 16000000
 TARGET  ?= main.ihx
 
 LIBDIR   = ../../lib
