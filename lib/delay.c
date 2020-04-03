@@ -1,3 +1,6 @@
 #include "delay.h"
 #include <stdint.h>
-extern inline void delay_ms(uint32_t ms);
+
+inline void _delay_cycl( unsigned short __ticks );
+inline void delay_us( unsigned short __us );
+inline void delay_ms( unsigned short __ms );
