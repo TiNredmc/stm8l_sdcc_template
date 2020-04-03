@@ -7,19 +7,30 @@
 #warning "F_CPU not defined, using 2MHz by default"
 #define F_CPU 2000000UL
 #endif
-/* for 2MHz cpu */
-inline void delay_ms(uint32_t ms) {
-    for (uint32_t i = 0; i < ((F_CPU / 18 / 1000UL) * ms); i++) {
-        __asm__("nop");
-    }
+
+#define T_COUNT(x) (( x * (F_CPU / 1000000UL) )-5)/5)
+
+inline void _delay_cycl( unsigned short __ticks )
+{
+
+    __asm__("nop\n nop\n"); 
+    do {    
+      __ticks--;
+    } while ( __ticks );
+    __asm__("nop\n");
+}
+inline void delay_us( unsigned short __us )
+{
+    _delay_cycl((unsigned short)( T_COUNT(__us));
 }
 
-/* for 16MHz
-inline void delay_ms(uint32_t ms) {
-    for (uint32_t i = 0; i < ((F_CPU / 91 / 1000UL) * ms / 2); i++) {
-        __asm__("nop");
+inline void delay_ms( unsigned short __ms )
+{
+
+    while ( __ms-- )
+    {
+        delay_us( 400 );
     }
 }
-*/
 
 #endif /* DELAY_H */
