@@ -3,7 +3,7 @@
  */
  
 #ifndef I2C_H
-#include I2C_H
+#define I2C_H
 
 void i2c_init(uint8_t devID);
 uint8_t i2c_ChkEv(uint16_t I2C_Event); 
