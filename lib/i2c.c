@@ -1,7 +1,9 @@
 /* I2C implementations on STM8L, All EV number is the event number. took from the Standard Periherial Library
  * Coded by TinLethax
  */
-  
+#include "stm8l.h"
+#include "i2c.h"  
+
 uint16_t SCLSpeed = 0x00A0; // 50kHz
 void i2c_init(uint8_t devID) { // init I2C with Device address 
     CLK_CKDIVR = 0x00; // No clock divider
