@@ -3,14 +3,6 @@
 
 #include <stdint.h>
 
-#ifndef BAUDRATE
-#define BAUDRATE 115200
-#endif
-
-#ifndef F_CPU // f not define F_CPU
-#warning "F_CPU not defined, using 2MHz by default"
-#define F_CPU 2000000UL
-#endif
 
 /**
  * Initialize USART1.
