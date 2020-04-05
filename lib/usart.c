@@ -1,7 +1,7 @@
 #include "usart.h"
 #include "stm8l.h"
 
-void usart_init() {
+void usart_init(uint16_t BAUDRATE) {
 /*Set clock divider to 1, because the SDCC always set to 8 */
 CLK_CKDIVR = 0x00;
 /*Enable clock for USART1*/
