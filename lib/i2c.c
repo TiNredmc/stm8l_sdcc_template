@@ -7,18 +7,19 @@
 uint16_t SCLSpeed = 0x00A0; // 50kHz
 void i2c_init(uint8_t devID) { // init I2C with Device address 
     CLK_CKDIVR = 0x00; // No clock divider
+    CLK_PCKENR1 |= (uint8_t)(1 << 0x03);// enable the I2C clock 
     I2C1_FREQR |= F_CPU/1000000 ;// 16MHz/10^6
 	
     I2C1_CR1 &= ~0x01;// cmd disable for i2c configurating
 
     I2C1_TRISER |= (uint8_t)(0);// 0 in decimal, Very Short Riser Time (suitable for MLX90614, That why i came up with this library)
 
-    I2C1_CCRL = (uint8_t)SCLSpeed;
-    I2C1_CCRH = (uint8_t)((SCLSpeed >> 8) & 0x0F);
+    I2C1_CCRL = (uint8_t)SCLSpeed;// the clock speed lower bits
+    I2C1_CCRH = (uint8_t)((SCLSpeed >> 8) & 0x0F);// the clock speed higher bits
 
     I2C1_CR1 |= (0x00 | 0x01);// i2c mode not SMBus
 	
-    I2C1_OARL = (uint8_t)(devID);
+    I2C1_OARL = (uint8_t)(devID);// deviceID 
     I2C1_OARH = (uint8_t)((uint8_t)(0x00 | 0x40 ) | (uint8_t)((uint16_t)( (uint16_t)devID &  (uint16_t)0x0300) >> 7)); 
 	
     I2C1_CR1 |= (1 << 0);// cmd enable
