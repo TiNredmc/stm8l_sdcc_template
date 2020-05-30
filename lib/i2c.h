@@ -5,7 +5,7 @@
 #ifndef I2C_H
 #define I2C_H
 
-void i2c_init(uint8_t devID);
+void i2c_init(uint8_t devID, uint16_t SCLSpeed);
 uint8_t i2c_ChkEv(uint16_t I2C_Event); 
 void i2c_start();
 void i2c_stop();
