@@ -4,8 +4,8 @@
 #include <stm8l.h>
 #include <i2c.h>  
 
-uint16_t SCLSpeed = 0x00A0; // 50kHz
-void i2c_init(uint8_t devID) { // init I2C with Device address 
+
+void i2c_init(uint8_t devID, uint16_t SCLSpeed) { // init I2C with Device address 
     CLK_CKDIVR = 0x00; // No clock divider
     CLK_PCKENR1 |= (uint8_t)(1 << 0x03);// enable the I2C clock 
     I2C1_FREQR |= F_CPU/1000000 ;// 16MHz/10^6
