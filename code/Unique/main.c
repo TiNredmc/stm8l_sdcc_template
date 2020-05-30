@@ -18,6 +18,7 @@ int get_char() {
 }
 
 void main() {
+CLK_CKDIVR = 0x00;// make sure that we don't divide our clock.
 SYSCFG_RMPCR1 &= (uint8_t)((uint8_t)((uint8_t)REMAP_Pin << 4) | (uint8_t)0x0F); //remap the non-exit pin of Tx and Rx of the UFQFPN20 package to the exit one.
 SYSCFG_RMPCR1 |= (uint8_t)((uint16_t)REMAP_Pin & (uint16_t)0x00F0);
 delay_ms(1000); //wait a sec
