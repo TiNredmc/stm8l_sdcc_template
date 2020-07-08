@@ -19,7 +19,7 @@ void main() {
 	TIM2_ARRH = 0x03;
 	TIM2_ARRL = 0xE8;
 
-	// We got the CK_CNT or counting clock from our CPU clock at 16MHz divided by 2^0x07 (128,It's prescaler), 
+	// We got the CK_CNT or counting clock from our CPU clock at 16MHz divided by 2^7 (128,It's prescaler), 
 	// So 16e^6/2^7 = 1.25e^5 (125KHz)
 	TIM2_PSCR = (uint8_t)0x07; 
 
