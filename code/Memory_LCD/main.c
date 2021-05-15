@@ -151,8 +151,6 @@ void main() {
 	//Disguise as a mirror.
 	SM_ScreenFill();
 	CloakState = true;
-
-
 	__asm__("rim");// enable interrupt
 	//after Cloaking done, We put CPU to Sleep
 	__asm__("wfi");// wait for interrupt A.K.A CPU sleep zZzZ
@@ -163,7 +161,13 @@ void main() {
 		}else{
 		//Do Spy Stuff
 		SM_ScreenClear();
-		/* [W.I.P] */
+		/* [W.I.P] 
+		Possible feature here 
+		- RTC clock and calendar
+		- secret messages (bitmap font implementation)
+		- Bitmap icons 
+		- U(S)ART RX console
+		*/
 		}
 	__asm__("halt");// Back to sleep 
 	}
