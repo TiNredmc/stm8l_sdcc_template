@@ -7,7 +7,7 @@
 #include <stm8l.h>
 
 //Serial Interface pins
-#define CLK	5
+#define SCK	5
 #define SDO	6
 #define SCS	7
 #define DSP	4
@@ -19,11 +19,12 @@
 #define BTN	   0 //PD0
 
 //Display buffer Setup
-#define DCol = 96; // 96px width 
-#define DRow = 96; // 96px height
-#define linebuf = DCol / 8;
+#define DCol 96 // 96px width 
+#define DRow 96 // 96px height
+#define linebuf DCol/8
 
-//uint8_t DispBuf[linebuf*
+/* [W.I.P] */
+//uint8_t DispBuf[linebuf*DRow];
 //Using Flash space from UBC area, offset at page 109 (using 18 pages, 64 byte each)
 uint8_t SendBuf[linebuf+4];
 
@@ -33,8 +34,8 @@ bool CloakState = false; //CloakState True -> Normal Mirror, CloakState false ->
 
 void SM_GPIOsetup(){// GPIO Setup
 	//Serial interface pins
-	PB_DDR |= (1 << CLK) | (1 << SDO) | (1 << SCS) | (1 << DSP);
-	PB_CR1 |= (1 << CLK) | (1 << SDO) | (1 << SCS) | (1 << DSP);
+	PB_DDR |= (1 << SCK) | (1 << SDO) | (1 << SCS) | (1 << DSP);
+	PB_CR1 |= (1 << SCK) | (1 << SDO) | (1 << SCS) | (1 << DSP);
 	
 	PB_ODR |= (1 << SCS);
 
@@ -93,7 +94,7 @@ void SM_sendByte(uint8_t *dat){
 	
 	for(uint8_t j=8; j == 0;j--){// (LSB first)
 	PB_ODR |= (1 << SCK); // _/
-	PB_ODR = ( (uint8_t)(dat << (j-1)) << SDO); // 1/0 (LSB first)
+	PB_ODR = (((uintptr_t)dat << (j-1)) << SDO); // 1/0 (LSB first)
 	PB_ODR &= (0 << SCK);// \_
 	}
 	
@@ -116,7 +117,7 @@ void SM_lineUpdate(uint8_t line){
 
 void SM_ScreenFill(){
 	for(uint8_t i=0;i < linebuf;i++){
-	Sendbuf[i+2] = 0xFF;//set all pixel to 1 (turn pixel to black/reflective)
+	SendBuf[i+2] = 0xFF;//set all pixel to 1 (turn pixel to black/reflective)
 	}
 
 	for(uint8_t i=0;i < DRow;i++)
@@ -131,14 +132,14 @@ void SM_ScreenClear(){
 	
 	//Packet structure looks like this : command, dummy byte
 	//[CMD][0x00] 
-	for(uint8_t i=0; i < 2i++){
+	for(uint8_t i=0; i < 2;i++){
 	SM_sendByte(SendBuf+i);
 	}
 
 	PB_ODR &= (0 << SCS);// End tranmission	
 }
 
-void SwitchTF __intterrupt(7){// Interrupt Vector Number 7 (take a look at Datasheet, Deffinitely difference)
+void SwitchTF(void) __interrupt(7){// Interrupt Vector Number 7 (take a look at Datasheet, Deffinitely difference)
 	CloakState = !CloakState;
 }
 
