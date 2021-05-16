@@ -6,7 +6,8 @@
 #include <string.h>
 #include <stm8l.h>
 
-//Serial Interface pins
+//Serial Interface 
+#define SPI1_DR_ADDR 0x5204
 #define SCK	5
 #define SDO	6
 #define SCS	7
@@ -27,7 +28,7 @@
 //Using Flash space from UBC area, offset at page 110 (using 18 pages, 64 bytes each)
 __at(0x9B7F) uint8_t DispBuf[FB_Size];// We store our data in the Flash memory (the entire screen framebuffer).
 //Serial buffer array
-uint8_t SendBuf[linebuf+4];
+static uint8_t SendBuf[linebuf+4]={0};
 
 
 //interrupt stuffs
@@ -52,9 +53,15 @@ void SM_GPIOsetup(){// GPIO Setup
 }	
 
 void SM_periphSetup(){// Peripheral Setup. PWM, Timer and Interrupt
+	// Peripheral Clock setup
+	CLK_ICKCR=(1 << CLK_ICKCR_LSION);// turn LowSpeedInternal Clock
+	while (!(CLK_ICKCR & (1 << CLK_ICKCR_LSIRDY)));  // enable LSI oscillator.  
 
+	CLK_CRTCR = 0x04; //set the RTC clock to LSI clock and set the divider at 1 
+	CLK_PCKENR1 |= (1 << 0) | (1 << 4);// Enable Timer2 and SPI1 clock system
+	CLK_PCKENR2 |= (1 << 2) | (1 << 4);// Enable RTC and DMA clock system
 	// Timer PWM setup
-
+	
 	//Timer 2 init for PWM with ARR = 2500 (50Hz)
 	TIM2_ARRH = 0x09;
 	TIM2_ARRL = 0xC4;
@@ -89,6 +96,56 @@ void SM_periphSetup(){// Peripheral Setup. PWM, Timer and Interrupt
 	ITC_SPR2 |= 0x40;// Enable Port D interrupt
 
 	EXTI_CR2 |=  0x03;// PD0 detecting both Rise and Fall
+	//===============================================
+	
+	// SPI setup 
+	SPI1_CR1 |= (1 << 7) | (3 << 3) | (1 << 2);// LSB First, 1MHz SPI speed, Master Mode .
+	SPI1_CR2 |= (1 << 7) | (1 << 6);// Transmit Only in 1 line mode.
+	
+	//===============================================
+
+	// DMA setup
+	DMA1_GCSR = (uint8_t)(0x3F << 2);// set DMA timeout
+	
+	DMA1_C2CR &= (0 << 0);// Temporaly disable DMA channel 2 
+	DMA1_C2CR |= (1 << 5) | (1 << 3);// DMA Memory incremented up, DMA Memory to Peripheral mode 
+	DMA1_C2SPR |= (1 << 5);// Priority High (Also using 8-bit Transfer size)
+	DMA1_C2NDTR = 16;// Size of buf to be transfered, in this case is 16 bytes  
+
+	DMA1_C2PARH = (uint8_t)(SPI1_DR_ADDR >> 8);// Higher byte of SPI data register mem location
+	DMA1_C2PARL = (uint8_t)(SPI1_DR_ADDR);// Lower byte of SPI data register mem location
+	DMA1_C2M0ARH = (uint8_t)((uint16_t)SendBuf >> 8);// Higher byte of Tx mem location
+	DMA1_C2M0ARL = (uint8_t)((uint16_t)SendBuf);// Lower byte of Tx mem location
+
+	SPI1_CR1 |= (1 << 6);// Enable Tx DMA  
+
+	DMA1_C2CR |= (1 << 0);// Enable DMA channel 2
+
+	SPI1_CR1 |= (1 << 6);// Enable SPI
+	//===============================================
+
+	// RTC Setup
+
+	//unlock the writing protection
+	RTC_WPR = 0xCA;
+	RTC_WPR = 0x53;
+
+	if(RTC_ISR1 & 0x40)// Init-ed ?
+		RTC_ISR1 |= (0x80);// If not, Let wake him up !
+	while (RTC_ISR1 & 0x40);// He might take a while 
+
+	RTC_CR1 &= (0 << 6);// 24 Hour format
+	RTC_CR1 |= (1 << 4);// Using direct R/W instead of Shadow memory 
+
+	//set the Prescalers regs
+	RTC_SPRERH = 0x00;
+	RTC_SPRERL = 0xFF;
+	RTC_APRER  = 0x7F;
+	//exit init mode
+	RTC_ISR1 = (0 << 7);
+
+	//lock write protection
+	RTC_WPR = 0xFF; 
 }
 
 void SM_malloc(){//We will use very last pages on our Flash memory from page number 110 to 127
@@ -109,7 +166,7 @@ void SM_malloc(){//We will use very last pages on our Flash memory from page num
 	FLASH_IAPSR &= 0xFD;// Re-loack flash (Program region) after write
 }
 
-void SM_sendByte(uint8_t *dat){
+void SM_sendByte(uint8_t *dat){// SPI bit banging (will use SPI+DMA later)
 	
 	for(uint8_t j=8; j == 0;j--){// (LSB first)
 	PB_ODR |= (1 << SCK); // _/
@@ -119,7 +176,7 @@ void SM_sendByte(uint8_t *dat){
 	
 }
 
-void SM_lineUpdate(uint8_t line){
+void SM_lineUpdate(uint8_t line){// Single Row display update
 	PB_ODR |= (1 << SCS);// Start transmission 
 
 	SendBuf[0] = 0x01;// Display update Command
@@ -134,7 +191,7 @@ void SM_lineUpdate(uint8_t line){
 	PB_ODR &= (0 << SCS);// End tranmission
 }
 
-void SM_ScreenFill(){
+void SM_ScreenFill(){// Fill entire screen with black/reflective pixels
 	for(uint8_t i=0;i < linebuf;i++){
 	SendBuf[i+2] = 0xFF;//set all pixel to 1 (turn pixel to black/reflective)
 	}
@@ -143,7 +200,7 @@ void SM_ScreenFill(){
 		SM_lineUpdate(i);
 }
 
-void SM_ScreenClear(){
+void SM_ScreenClear(){// Tiddy-Up the entire screen
 	PB_ODR |= (1 << SCS);// Start tranmission
 
 	SendBuf[0] = 0x04;// Display clear command
@@ -156,6 +213,9 @@ void SM_ScreenClear(){
 	}
 
 	PB_ODR &= (0 << SCS);// End tranmission	
+}
+
+void SM_ScreenFBU(){// Update entire Display with Framebuffer mem
 }
 
 void SwitchTF(void) __interrupt(7){// Interrupt Vector Number 7 (take a look at Datasheet, Deffinitely difference)
@@ -189,6 +249,6 @@ void main() {
 		- U(S)ART RX console
 		*/
 		}
-	__asm__("halt");// Back to sleep 
+	__asm__("wfi");// Back to sleep 
 	}
 }
