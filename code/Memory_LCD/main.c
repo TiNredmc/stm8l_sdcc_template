@@ -19,13 +19,14 @@
 #define BTN	   0 //PD0
 
 //Display buffer Setup
-#define DCol 96 // 96px width 
-#define DRow 96 // 96px height
+#define DCol	96 // 96px width 
+#define DRow	96 // 96px height
 #define linebuf DCol/8
-
+#define FB_Size	linebuf*DRow
 /* [W.I.P] */
-//uint8_t DispBuf[linebuf*DRow];
-//Using Flash space from UBC area, offset at page 109 (using 18 pages, 64 byte each)
+//Using Flash space from UBC area, offset at page 110 (using 18 pages, 64 bytes each)
+__at(0x9B7F) uint8_t DispBuf[FB_Size];// We store our data in the Flash memory (the entire screen framebuffer).
+//Serial buffer array
 uint8_t SendBuf[linebuf+4];
 
 
@@ -90,6 +91,24 @@ void SM_periphSetup(){// Peripheral Setup. PWM, Timer and Interrupt
 	EXTI_CR2 |=  0x03;// PD0 detecting both Rise and Fall
 }
 
+void SM_malloc(){//We will use very last pages on our Flash memory from page number 110 to 127
+	//Flash set programming time
+	FLASH_CR1 |= 0x10; //fast programming mode 
+	
+	//Flash unlock (Program region not EEPROM (data) region)
+	FLASH_PUKR = FLASH_PUKR_KEY1;
+	FLASH_PUKR = FLASH_PUKR_KEY2;
+
+	while(!(FLASH_IAPSR & (1 << FLASH_IAPSR_PUL)));// wait until Flash in unlocked
+
+	for(uint16_t i=0;i < FB_Size;i++){// Fill Framebuffer with 0
+		DispBuf[i] = 0;
+		while (!(FLASH_IAPSR & (1 << FLASH_IAPSR_EOP)));
+	}
+		
+	FLASH_IAPSR &= 0xFD;// Re-loack flash (Program region) after write
+}
+
 void SM_sendByte(uint8_t *dat){
 	
 	for(uint8_t j=8; j == 0;j--){// (LSB first)
@@ -147,7 +166,7 @@ void main() {
 	CLK_CKDIVR = 0x00;// Get full 16MHz clock 
 	SM_GPIOsetup();// GPIO setup
 	SM_periphSetup();// Peripheral Setup
-	
+	SM_malloc();// Allocate flash memory for Framebuffer mem (we have very limited RAM, 1K isn't enought).
 	//After power on, Fill the display with black (reflective) pixel (Active HIGH, Set 1 to turn black).
 	//Disguise as a mirror.
 	SM_ScreenFill();
