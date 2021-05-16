@@ -10,8 +10,8 @@
 #define SPI1_DR_ADDR 0x5204
 #define SCK	5
 #define SDO	6
-#define SCS	7
-#define DSP	4
+#define SCS	4
+#define DSP	3
 
 // PWM pin 
 #define EXTCOM     0 //PB0 
@@ -24,22 +24,29 @@
 #define DRow	96 // 96px height
 #define linebuf DCol/8
 #define FB_Size	linebuf*DRow
+
 /* [W.I.P] */
 //Using Flash space from UBC area, offset at page 110 (using 18 pages, 64 bytes each)
 __at(0x9B7F) uint8_t DispBuf[FB_Size];// We store our data in the Flash memory (the entire screen framebuffer).
+/* Page - > [Row n data][Row n+1 data][Row n+2 data][Row n+3 data] (16Bytes x4)
+ *           ^      1st byte on page                     2nd byte on page                           4th byte on page
+ *     [CMD][ROW][12 Bytes Display Data][Dummy x2]-[Dummy][ROW][12 Bytes Display Data][Dummy x2]...[Dummy x2]      
+ */
+
 //Serial buffer array
 static uint8_t SendBuf[linebuf+4]={0};
-
+#define HWSPI
 
 //interrupt stuffs
 bool CloakState = false; //CloakState True -> Normal Mirror, CloakState false -> Hello again, Dumbbell (you get it if you play TF2).
 
 void SM_GPIOsetup(){// GPIO Setup
 	//Serial interface pins
-	PB_DDR |= (1 << SCK) | (1 << SDO) | (1 << SCS) | (1 << DSP);
-	PB_CR1 |= (1 << SCK) | (1 << SDO) | (1 << SCS) | (1 << DSP);
-	
-	PB_ODR |= (1 << SCS);
+	PB_DDR |= (1 << SCK) | (1 << SDO) | (1 << SCS) | (1 << DSP);// All pins as output
+	PB_CR1 |= (1 << SCK) | (1 << SDO) | (1 << SCS) | (1 << DSP);// with PUsh-Pull mode
+	PB_CR2 |= (1 << SCK) | (1 << SDO);// But some (MOSI and SCK) need HIGH SPEEEEEEEEDDDDD.
+
+	PB_ODR &= (0 << SCS);// for some waird reason, this DIsplay love active high chip select....
 
 	//External COM signal pin [PWM]
 	PB_DDR |= (1 << EXTCOM);
@@ -99,9 +106,10 @@ void SM_periphSetup(){// Peripheral Setup. PWM, Timer and Interrupt
 	//===============================================
 	
 	// SPI setup 
-	SPI1_CR1 |= (1 << 7) | (3 << 3) | (1 << 2);// LSB First, 1MHz SPI speed, Master Mode .
-	SPI1_CR2 |= (1 << 7) | (1 << 6);// Transmit Only in 1 line mode.
-	
+	SPI1_CR1 |= (1 << 7) | (3 << 3);// LSB First, 1MHz SPI speed.
+	SPI1_CR2 |= (1 << 7) | (1 << 6) | 0x03;// Transmit Only in 1 line mode, soft NSS enabled
+	SPI1_CR1 |= (1 << 2);// SPI Master Mode 
+	SPI1_CRCPR = 0x00;// No CRC 
 	//===============================================
 
 	// DMA setup
@@ -117,7 +125,7 @@ void SM_periphSetup(){// Peripheral Setup. PWM, Timer and Interrupt
 	DMA1_C2M0ARH = (uint8_t)((uint16_t)SendBuf >> 8);// Higher byte of Tx mem location
 	DMA1_C2M0ARL = (uint8_t)((uint16_t)SendBuf);// Lower byte of Tx mem location
 
-	SPI1_CR1 |= (1 << 6);// Enable Tx DMA  
+	SPI1_ICR |= (1 << 6);// Enable Tx DMA  
 
 	DMA1_C2CR |= (1 << 0);// Enable DMA channel 2
 
@@ -163,17 +171,20 @@ void SM_malloc(){//We will use very last pages on our Flash memory from page num
 		while (!(FLASH_IAPSR & (1 << FLASH_IAPSR_EOP)));
 	}
 		
-	FLASH_IAPSR &= 0xFD;// Re-loack flash (Program region) after write
+	FLASH_IAPSR &= 0xFD;// Re-lock flash (Program region) after write
 }
 
 void SM_sendByte(uint8_t *dat){// SPI bit banging (will use SPI+DMA later)
-	
+#ifdef HWSPI
+	SPI1_DR = (uintptr_t)dat;
+	while (!(SPI1_SR & (1 << SPI1_SR_TXE)));
+#else	
 	for(uint8_t j=8; j == 0;j--){// (LSB first)
 	PB_ODR |= (1 << SCK); // _/
 	PB_ODR = (((uintptr_t)dat << (j-1)) << SDO); // 1/0 (LSB first)
 	PB_ODR &= (0 << SCK);// \_
 	}
-	
+#endif	
 }
 
 void SM_lineUpdate(uint8_t line){// Single Row display update
@@ -216,6 +227,11 @@ void SM_ScreenClear(){// Tiddy-Up the entire screen
 }
 
 void SM_ScreenFBU(){// Update entire Display with Framebuffer mem
+	//Re configure DMA
+
+	//Start DMA
+	while(!(SPI1_SR & 0x02));// wait until SPI is tranmisted 
+	SPI1_ICR |= (1 << 1);// DMA tranmist request 
 }
 
 void SwitchTF(void) __interrupt(7){// Interrupt Vector Number 7 (take a look at Datasheet, Deffinitely difference)
@@ -248,6 +264,11 @@ void main() {
 		- Bitmap icons 
 		- U(S)ART RX console
 		*/
+		while(!CloakState){
+
+
+		}
+
 		}
 	__asm__("wfi");// Back to sleep 
 	}
