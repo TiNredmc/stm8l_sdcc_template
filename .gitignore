@@ -1,0 +1,12 @@
+# This is git Ignore created by me TinLethax
+# This will exclude object file, Assembly or anything that is not Makefile or source and header
+
+*.asm
+*.cdb
+*.lk
+*.lst
+*.map
+*.rel
+*.rst
+*.sym
+
