@@ -41,22 +41,22 @@ static uint8_t SendBuf[linebuf+4]={0};
 bool CloakState = false; //CloakState True -> Normal Mirror, CloakState false -> Hello again, Dumbbell (you get it if you play TF2).
 
 void SM_GPIOsetup(){// GPIO Setup
-	//Serial interface pins
+	// Serial interface pins
 	PB_DDR |= (1 << SCK) | (1 << SDO) | (1 << SCS) | (1 << DSP);// All pins as output
 	PB_CR1 |= (1 << SCK) | (1 << SDO) | (1 << SCS) | (1 << DSP);// with PUsh-Pull mode
 	PB_CR2 |= (1 << SCK) | (1 << SDO);// But some (MOSI and SCK) need HIGH SPEEEEEEEEDDDDD.
 
 	PB_ODR &= (0 << SCS);// for some waird reason, this DIsplay love active high chip select....
 
-	//External COM signal pin [PWM]
-	PB_DDR |= (1 << EXTCOM);
-	PB_CR1 |= (1 << EXTCOM);
-	PB_CR2 |= (1 << EXTCOM);//fast mode
+	// External COM signal pin [PWM]
+	PB_DDR |= (1 << EXTCOM);// This is the PWM output pin for EXTCOM inverting signal
+	PB_CR1 |= (1 << EXTCOM);// Push-Pull mode
+	PB_CR2 |= (1 << EXTCOM);// fast mode
 
-	//Wake Up Interrupt pin
-	PD_DDR |= (0 << BTN);//init pin PD5 as input
-	PD_CR1 |= (0 << BTN);//floating input
-	PD_CR2 |= (1 << BTN);//interrupt
+	// Wake Up Interrupt pin
+	PD_DDR |= (0 << BTN);// init pin PD5 as input
+	PD_CR1 |= (1 << BTN);// Input pullup
+	PD_CR2 |= (1 << BTN);// interrupt
 }	
 
 void SM_periphSetup(){// Peripheral Setup. PWM, Timer and Interrupt
@@ -102,7 +102,7 @@ void SM_periphSetup(){// Peripheral Setup. PWM, Timer and Interrupt
 
 	ITC_SPR2 |= 0x40;// Enable Port D interrupt
 
-	EXTI_CR2 |=  0x03;// PD0 detecting both Rise and Fall
+	EXTI_CR2 |=  0x02;// PD0 detecting Falliing-Edge only
 	//===============================================
 	
 	// SPI setup 
@@ -134,7 +134,7 @@ void SM_periphSetup(){// Peripheral Setup. PWM, Timer and Interrupt
 
 	// RTC Setup
 
-	//unlock the writing protection
+	// unlock the writing protection
 	RTC_WPR = 0xCA;
 	RTC_WPR = 0x53;
 
@@ -145,22 +145,22 @@ void SM_periphSetup(){// Peripheral Setup. PWM, Timer and Interrupt
 	RTC_CR1 &= (0 << 6);// 24 Hour format
 	RTC_CR1 |= (1 << 4);// Using direct R/W instead of Shadow memory 
 
-	//set the Prescalers regs
+	// set the Prescalers regs
 	RTC_SPRERH = 0x00;
 	RTC_SPRERL = 0xFF;
 	RTC_APRER  = 0x7F;
-	//exit init mode
+	// exit init mode
 	RTC_ISR1 = (0 << 7);
 
-	//lock write protection
+	// lock write protection
 	RTC_WPR = 0xFF; 
 }
 
 void SM_malloc(){//We will use very last pages on our Flash memory from page number 110 to 127
-	//Flash set programming time
-	FLASH_CR1 |= 0x10; //fast programming mode 
+	// Flash set programming time
+	FLASH_CR1 |= 0x10; // fast programming mode 
 	
-	//Flash unlock (Program region not EEPROM (data) region)
+	// Flash unlock (Program region not EEPROM (data) region)
 	FLASH_PUKR = FLASH_PUKR_KEY1;
 	FLASH_PUKR = FLASH_PUKR_KEY2;
 
