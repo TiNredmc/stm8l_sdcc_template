@@ -6,18 +6,28 @@
 #include <string.h>
 #include <stm8l.h>
 
+/* Connection Guide */
+// MCU -> Display
+// PB5 -> SCLK 	(1)
+// PB6 -> SI	(2)
+// PB4 -> SCS	(3)
+// PB0 -> EXTCOM(4)
+// PB3 -> DISP	(5)
+
+// NOTE : The ExtComIn mode is External signal (Tie EXTMODE pin to VCC)
+
 //Serial Interface 
 #define SPI1_DR_ADDR 0x5204
-#define SCK	5
-#define SDO	6
-#define SCS	4
-#define DSP	3
+#define SCK	5 // PB5 
+#define SDO	6 // PB6
+#define SCS	4 // PB4
+#define DSP	3 // PB3
 
 // PWM pin 
-#define EXTCOM     0 //PB0 
+#define EXTCOM     0 // PB0 
 
 //INT pin for waking up MCU
-#define BTN	   0 //PD0
+#define BTN	   0 // PD0
 
 //Display buffer Setup
 #define DCol	96 // 96px width 
@@ -38,7 +48,7 @@ static uint8_t SendBuf[linebuf+4]={0};
 #define HWSPI
 
 //interrupt stuffs
-bool CloakState = false; //CloakState True -> Normal Mirror, CloakState false -> Hello again, Dumbbell (you get it if you play TF2).
+bool CloakState; //CloakState True -> Normal Mirror, CloakState false -> Hello again, Dumbbell (you get it if you play TF2).
 
 void SM_GPIOsetup(){// GPIO Setup
 	// Serial interface pins
@@ -46,7 +56,7 @@ void SM_GPIOsetup(){// GPIO Setup
 	PB_CR1 |= (1 << SCK) | (1 << SDO) | (1 << SCS) | (1 << DSP);// with PUsh-Pull mode
 	PB_CR2 |= (1 << SCK) | (1 << SDO);// But some (MOSI and SCK) need HIGH SPEEEEEEEEDDDDD.
 
-	PB_ODR &= (0 << SCS);// for some waird reason, this DIsplay love active high chip select....
+	PB_ODR &= (0 << SCS);// for some weird reason, this Display love active high chip select....
 
 	// External COM signal pin [PWM]
 	PB_DDR |= (1 << EXTCOM);// This is the PWM output pin for EXTCOM inverting signal
@@ -156,21 +166,18 @@ void SM_periphSetup(){// Peripheral Setup. PWM, Timer and Interrupt
 	RTC_WPR = 0xFF; 
 }
 
-void SM_malloc(){//We will use very last pages on our Flash memory from page number 110 to 127
-	// Flash set programming time
-	FLASH_CR1 |= 0x10; // fast programming mode 
-	
+void SM_malloc(){//We will use very last pages on our Flash memory from page number 110 to 127	
 	// Flash unlock (Program region not EEPROM (data) region)
-	FLASH_PUKR = FLASH_PUKR_KEY1;
-	FLASH_PUKR = FLASH_PUKR_KEY2;
-
+	FLASH_PUKR = FLASH_PUKR_KEY1;// 0x56
+	FLASH_PUKR = FLASH_PUKR_KEY2;// 0xAE
 	while(!(FLASH_IAPSR & (1 << FLASH_IAPSR_PUL)));// wait until Flash in unlocked
 
-	for(uint16_t i=0;i < FB_Size;i++){// Fill Framebuffer with 0
-		DispBuf[i] = 0;
-		while (!(FLASH_IAPSR & (1 << FLASH_IAPSR_EOP)));
+	for(uint16_t i=0;i < FB_Size;i++){// Fill Framebuffer with 0x01
+		DispBuf[i] = 0x01;
 	}
-		
+
+	while (!(FLASH_IAPSR & (1 << FLASH_IAPSR_EOP)));// Wait until data is written to Flash	
+
 	FLASH_IAPSR &= 0xFD;// Re-lock flash (Program region) after write
 }
 
@@ -207,7 +214,7 @@ void SM_ScreenFill(){// Fill entire screen with black/reflective pixels
 	SendBuf[i+2] = 0xFF;//set all pixel to 1 (turn pixel to black/reflective)
 	}
 
-	for(uint8_t i=0;i < DRow;i++)
+	for(uint16_t i=0;i < DRow;i++)
 		SM_lineUpdate(i);
 }
 
@@ -243,13 +250,15 @@ void main() {
 	SM_GPIOsetup();// GPIO setup
 	SM_periphSetup();// Peripheral Setup
 	SM_malloc();// Allocate flash memory for Framebuffer mem (we have very limited RAM, 1K isn't enought).
+	
+	SM_ScreenClear();
 	//After power on, Fill the display with black (reflective) pixel (Active HIGH, Set 1 to turn black).
 	//Disguise as a mirror.
 	SM_ScreenFill();
 	CloakState = true;
 	__asm__("rim");// enable interrupt
 	//after Cloaking done, We put CPU to Sleep
-	__asm__("wfi");// wait for interrupt A.K.A CPU sleep zZzZ
+	//__asm__("wfi");// wait for interrupt A.K.A CPU sleep zZzZ
 	while (1) {
 		if(CloakState){
 		//Disguise as a Mirror
@@ -270,6 +279,6 @@ void main() {
 		}
 
 		}
-	__asm__("wfi");// Back to sleep 
+	//__asm__("wfi");// Back to sleep 
 	}
 }
