@@ -38,10 +38,8 @@
 /* [W.I.P] */
 //Using Flash space from UBC area, offset at page 110 (using 18 pages, 64 bytes each)
 __at(0x9B7F) uint8_t DispBuf[FB_Size];// We store our data in the Flash memory (the entire screen framebuffer).
-/* Page - > [Row n data][Row n+1 data][Row n+2 data][Row n+3 data] (16Bytes x4)
- *           ^      1st byte on page                     2nd byte on page                           4th byte on page
- *     [CMD][ROW][12 Bytes Display Data][Dummy x2]-[Dummy][ROW][12 Bytes Display Data][Dummy x2]...[Dummy x2]      
- */
+/* 1 byte contain 8 pixels data, using */
+/* the way that the packet is sent and how to grab the right FB data is the same as my STM32 project (on my GitHub). */
 
 //Serial buffer array
 static uint8_t SendBuf[linebuf+4]={0};
@@ -76,7 +74,7 @@ void SM_periphSetup(){// Peripheral Setup. PWM, Timer and Interrupt
 
 	CLK_CRTCR = 0x04; //set the RTC clock to LSI clock and set the divider at 1 
 	CLK_PCKENR1 |= (1 << 0) | (1 << 4);// Enable Timer2 and SPI1 clock system
-	CLK_PCKENR2 |= (1 << 2) | (1 << 4);// Enable RTC and DMA clock system
+	CLK_PCKENR2 |= (1 << 2) ;// Enable RTC (UNUSED FOR NOW | (1 << 4) and DMA clock system)
 	// Timer PWM setup
 	
 	//Timer 2 init for PWM with ARR = 2500 (50Hz)
@@ -120,9 +118,14 @@ void SM_periphSetup(){// Peripheral Setup. PWM, Timer and Interrupt
 	SPI1_CR2 |= (1 << 7) | (1 << 6) | 0x03;// Transmit Only in 1 line mode, soft NSS enabled
 	SPI1_CR1 |= (1 << 2);// SPI Master Mode 
 	SPI1_CRCPR = 0x00;// No CRC 
+
+	SPI1_CR1 |= (1 << 6);// Enable SPI
 	//===============================================
 
-	// DMA setup
+	// DMA setup	
+	// DMA is usefull for update entire display, but using flash as ram to hold 96 packet is bad Idea. might consider a smaller packet to fit in 1K of mem.
+	/*
+	DMA1_GCSR = 0xFC;// Reset DMA global setting.
 	DMA1_GCSR = (uint8_t)(0x3F << 2);// set DMA timeout
 	
 	DMA1_C2CR &= (0 << 0);// Temporaly disable DMA channel 2 
@@ -137,9 +140,10 @@ void SM_periphSetup(){// Peripheral Setup. PWM, Timer and Interrupt
 
 	SPI1_ICR |= (1 << 6);// Enable Tx DMA  
 
+	DMA1_GCSR |= (1 << 0);// Enable Global DMA 
 	DMA1_C2CR |= (1 << 0);// Enable DMA channel 2
+ 	*/
 
-	SPI1_CR1 |= (1 << 6);// Enable SPI
 	//===============================================
 
 	// RTC Setup
@@ -181,15 +185,21 @@ void SM_malloc(){//We will use very last pages on our Flash memory from page num
 	FLASH_IAPSR &= 0xFD;// Re-lock flash (Program region) after write
 }
 
-void SM_sendByte(uint8_t *dat){// SPI bit banging (will use SPI+DMA later)
+void SM_sendByte(uint8_t *dat, size_t len){// SPI bit banging (will use SPI+DMA later)
 #ifdef HWSPI
-	SPI1_DR = (uintptr_t)dat;
-	while (!(SPI1_SR & (1 << SPI1_SR_TXE)));
+	while(len--){
+		SPI1_DR = (uintptr_t)dat;
+		while (!(SPI1_SR & (1 << SPI1_SR_TXE)));
+	dat++;
+	}
 #else	
-	for(uint8_t j=8; j == 0;j--){// (LSB first)
-	PB_ODR |= (1 << SCK); // _/
-	PB_ODR = (((uintptr_t)dat << (j-1)) << SDO); // 1/0 (LSB first)
-	PB_ODR &= (0 << SCK);// \_
+	while(len--){
+		for(uint8_t j=8; j == 0;j--){// (LSB first)
+		PB_ODR |= (1 << SCK); // _/
+		PB_ODR = (((uintptr_t)dat << (j-1)) << SDO); // 1/0 (LSB first)
+		PB_ODR &= (0 << SCK);// \_
+		}
+	dat++;
 	}
 #endif	
 }
@@ -202,11 +212,26 @@ void SM_lineUpdate(uint8_t line){// Single Row display update
 
 	//Packet structure looks like this : command,row number, display data, dummy byte x2
 	//[CMD][ROW][n bytes for 1 row][0x00][0x00] 
-	for(uint8_t i=0; i < linebuf+4;i++){
-	SM_sendByte(SendBuf+i);
-	}
+	SM_sendByte(SendBuf, sizeof(SendBuf));
 
-	PB_ODR &= (0 << SCS);// End tranmission
+	PB_ODR &= (0 << SCS);// End transmission
+}
+
+void SM_rangeUpdate(uint8_t Start, uint8_t End){// Multiple Row update from Start to End 
+	uint16_t offset = 0;
+	SendBuf[0] = 0x01;// Display update Command
+	SendBuf[1] = Start;
+
+	PB_ODR |= (1 << SCS);// Start transmission
+
+	for(;End >= Start; End--){
+		offset = (Start-1) * linebuf;
+		SM_sendByte(SendBuf,2);// Sending only two first bytes (command and row number)
+		SM_sendByte(DispBuf + offset,12);// then send out the 12 bytes (96 px)
+	}
+	SM_sendByte((uint8_t *)(0x00),2);// Send two dummy bytes to mark as end of transmission
+
+	PB_ODR &= (0 << SCS);// End transmission
 }
 
 void SM_ScreenFill(){// Fill entire screen with black/reflective pixels
@@ -226,19 +251,9 @@ void SM_ScreenClear(){// Tiddy-Up the entire screen
 	
 	//Packet structure looks like this : command, dummy byte
 	//[CMD][0x00] 
-	for(uint8_t i=0; i < 2;i++){
-	SM_sendByte(SendBuf+i);
-	}
-
+	SM_sendByte(SendBuf, 2);
+	
 	PB_ODR &= (0 << SCS);// End tranmission	
-}
-
-void SM_ScreenFBU(){// Update entire Display with Framebuffer mem
-	//Re configure DMA
-
-	//Start DMA
-	while(!(SPI1_SR & 0x02));// wait until SPI is tranmisted 
-	SPI1_ICR |= (1 << 1);// DMA tranmist request 
 }
 
 void SwitchTF(void) __interrupt(7){// Interrupt Vector Number 7 (take a look at Datasheet, Deffinitely difference)
@@ -258,7 +273,7 @@ void main() {
 	CloakState = true;
 	__asm__("rim");// enable interrupt
 	//after Cloaking done, We put CPU to Sleep
-	//__asm__("wfi");// wait for interrupt A.K.A CPU sleep zZzZ
+	__asm__("wfi");// wait for interrupt A.K.A CPU sleep zZzZ
 	while (1) {
 		if(CloakState){
 		//Disguise as a Mirror
@@ -279,6 +294,6 @@ void main() {
 		}
 
 		}
-	//__asm__("wfi");// Back to sleep 
+	__asm__("wfi");// Back to sleep 
 	}
 }
