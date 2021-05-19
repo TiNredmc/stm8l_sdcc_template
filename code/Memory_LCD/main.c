@@ -305,8 +305,8 @@ void SM_Print(unsigned char *txtBuf){
 uint16_t chOff = 0;
 
 while (*txtBuf){
-	// In case of reached 50 chars or newline detected , Do the newline
-	if ((Xcol > 50) || *txtBuf == 0x0A){
+	// In case of reached 10 chars or newline detected , Do the newline. Two characters are separated by 1 pixel 
+	if ((Xcol > 10) || *txtBuf == 0x0A){
 		Xcol = 1;// Move cursor to most left
 		YLine += 8;// enter new line
 		txtBuf++;// move to next char
@@ -327,6 +327,7 @@ while (*txtBuf){
 	Xcol++;// move cursor to next column
 	}
   }
+
 }
 
 void SwitchTF(void) __interrupt(7){// Interrupt Vector Number 7 (take a look at Datasheet, Deffinitely difference)
@@ -362,7 +363,7 @@ void main() {
 		- U(S)ART RX console
 		*/
 		while(!CloakState){
-
+			SM_Print("Hello world!");
 
 		}
 
