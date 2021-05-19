@@ -82,7 +82,13 @@ CLK_PCKENR2 |= (1 << 2);// enable rtc clock
 	RTC_WPR = 0xFF; 
 }
 
-void liteRTC_SetDMY(uint8_t SetDate, uint8_t SetMonth, uint8_t SetYear){// Set Date Month and Year (Year number 1 is Jan and Year nuber 12 is Dec : Very simple All human can do it ;D)
+/* Parameter descriptions
+ * SetDay : Day of week, Starting with Monday as 0x01 and so on, MAx is 0x07 (Sunday)
+ * SetDate : Date of that day. 1 to 31 (mind the leap year on Feb too, This one actually manage by calendar itself unless you update your own)
+ * SetMonth : Starting from January (0x01) to December (0x12) 
+ * SetYear : starting from 2000 (0) to 2099 (99) 
+ */
+void liteRTC_SetDMY(uint8_t SetDay,uint8_t SetDate, uint8_t SetMonth, uint8_t SetYear){// Set Date Month and Year (Year number 1 is Jan and Year nuber 12 is Dec : Very simple All human can do it ;D)
 
 	//unlock the writing protection
 	RTC_WPR = 0xCA;
@@ -106,9 +112,9 @@ void liteRTC_SetDMY(uint8_t SetDate, uint8_t SetMonth, uint8_t SetYear){// Set D
 	(void)(RTC_TR1);
 
 	//Set Date
-	RTC_DR1 = ByteToBcd2(SetDate & 0x40);
+	RTC_DR1 = ByteToBcd2(SetDate);
 	//Set Month
-	RTC_DR2 = ByteToBcd2(SetMonth);
+	RTC_DR2 = ByteToBcd2(SetMonth | (uint8_t)(SetDay << 5));
 	//Set Year
 	RTC_DR3 = ByteToBcd2(SetYear);
 
@@ -118,7 +124,11 @@ void liteRTC_SetDMY(uint8_t SetDate, uint8_t SetMonth, uint8_t SetYear){// Set D
 	//lock write protection
 	RTC_WPR = 0xFF; 
 }
-
+/* Parameter descriptions
+ * SetHour : Set Hour (0-23). This code is using 24 hour format
+ * SetMinute : Set Minute (0-59)
+ * SetSecond : Set Second (0-59)
+ */
 void liteRTC_SetHMS(uint8_t SetHour, uint8_t SetMinute, uint8_t SetSecond){// Set the Hour (24Hrs format), Minute, Second
 	//unlock the writing protection
 	RTC_WPR = 0xCA;
@@ -156,16 +166,30 @@ void liteRTC_SetHMS(uint8_t SetHour, uint8_t SetMinute, uint8_t SetSecond){// Se
 	RTC_WPR = 0xFF; 
 }
 
+/* Parameter descriptions
+ * *rH : pointer to the variable storing Hour
+ * *rM : pointer to the variable storing Minute
+ * *rS : pointer to the variable storing Second
+ */
 void liteRTC_grepTime(uint8_t *rH, uint8_t *rM, uint8_t * rS){
 	*rS = Bcd2ToByte(RTC_TR1);
 	*rM = Bcd2ToByte(RTC_TR2);
 	*rH = Bcd2ToByte(RTC_TR3 & 0x3F);// Grep only BCD2 part (we exclude AM/PM notation bit).
 }
 
-void liteRTC_grepDate(uint8_t *rDa, uint8_t *rMo, uint8_t *rYe){
-	*rDa = Bcd2ToByte(RTC_DR1);
+/* Parameter descriptions
+ * *rDay : pointer to the variable storing Day of week (in form of number)
+ * *rDate : pointer to the variable storing Date
+ * *rMo : pointer to the variable storing Month (in the form of number)
+ * *rYe : pointer to the variable storing Year (two last digit 20XX).
+ */
+void liteRTC_grepDate(uint8_t *rDay, uint8_t *rDate, uint8_t *rMo, uint8_t *rYe){
+	*rDate = Bcd2ToByte(RTC_DR1);
 	*rMo = Bcd2ToByte(RTC_DR2);
-	*rYe = Bcd2ToByte(RTC_DR3 & 0x1F);// Grep only BCD2 part (we exclude WeekDay notation bit).
+	*rYe = Bcd2ToByte(RTC_DR3);
+	
+	*rDay = *rDate << 5;// Grep Day of week number
+	*rDate = *rDate & 0x1F;// Clean out Day of week number from Date variable.
 }
 
 void main() {
