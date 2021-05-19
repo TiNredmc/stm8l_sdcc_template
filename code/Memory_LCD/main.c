@@ -5,7 +5,7 @@
 #include <stdbool.h>
 #include <string.h>
 #include <stm8l.h>
-
+#include "font8x8_basic.h"
 /* Connection Guide */
 // MCU -> Display
 // PB5 -> SCLK 	(1)
@@ -40,6 +40,13 @@
 __at(0x9B7F) uint8_t DispBuf[FB_Size];// We store our data in the Flash memory (the entire screen framebuffer).
 /* 1 byte contain 8 pixels data, using */
 /* the way that the packet is sent and how to grab the right FB data is the same as my STM32 project (on my GitHub). */
+
+//This buffer holds 1 Character bitmap image (8x8)
+static uint8_t chBuf[8];
+
+//These Vars required for print function
+static uint8_t YLine = 1;
+static uint8_t Xcol = 1;
 
 //Serial buffer array
 static uint8_t SendBuf[linebuf+4]={0};
@@ -185,6 +192,19 @@ void SM_malloc(){//We will use very last pages on our Flash memory from page num
 	FLASH_IAPSR &= 0xFD;// Re-lock flash (Program region) after write
 }
 
+void SM_flashWrite(void *Dest, const void *Src, size_t len){// It's memcpy but Flash friendly
+	// Flash unlock (Program region not EEPROM (data) region)
+	FLASH_PUKR = FLASH_PUKR_KEY1;// 0x56
+	FLASH_PUKR = FLASH_PUKR_KEY2;// 0xAE
+	while(!(FLASH_IAPSR & (1 << FLASH_IAPSR_PUL)));// wait until Flash in unlocked
+
+	memcpy(Dest, Src, len);
+
+	while (!(FLASH_IAPSR & (1 << FLASH_IAPSR_EOP)));// Wait until data is written to Flash	
+
+	FLASH_IAPSR &= 0xFD;// Re-lock flash (Program region) after write
+}
+
 void SM_sendByte(uint8_t *dat, size_t len){// SPI bit banging (will use SPI+DMA later)
 #ifdef HWSPI
 	while(len--){
@@ -244,6 +264,10 @@ void SM_ScreenFill(){// Fill entire screen with black/reflective pixels
 }
 
 void SM_ScreenClear(){// Tiddy-Up the entire screen
+	// Reset Cursor
+	YLine = 1;
+	Xcol = 1;
+
 	PB_ODR |= (1 << SCS);// Start tranmission
 
 	SendBuf[0] = 0x04;// Display clear command
@@ -254,6 +278,55 @@ void SM_ScreenClear(){// Tiddy-Up the entire screen
 	SM_sendByte(SendBuf, 2);
 	
 	PB_ODR &= (0 << SCS);// End tranmission	
+}
+
+void SM_loadPart(uint8_t* BMP, uint8_t Xcord, uint8_t Ycord, uint8_t bmpW, uint8_t bmpH){
+
+	Xcord = Xcord - 1;
+	Ycord = Ycord - 1;
+	uint16_t XYoff,WHoff = 0;
+
+	//Counting from Y origin point to bmpH using for loop
+	for(uint8_t loop = 0; loop < bmpH; loop++){
+		// turn X an Y into absolute offset number for Buffer
+		XYoff = (Ycord+loop) * DCol;
+		XYoff += Xcord;// offset start at the left most, The count from left to right for Xcord times
+
+		// turn W and H into absolute offset number for Bitmap image
+		WHoff = loop * bmpW;
+
+		SM_flashWrite(DispBuf + XYoff, BMP + WHoff, bmpW);
+	}
+
+}
+
+//Print 8x8 Text on screen
+void SM_Print(unsigned char *txtBuf){
+uint16_t chOff = 0;
+
+while (*txtBuf){
+	// In case of reached 50 chars or newline detected , Do the newline
+	if ((Xcol > 50) || *txtBuf == 0x0A){
+		Xcol = 1;// Move cursor to most left
+		YLine += 8;// enter new line
+		txtBuf++;// move to next char
+	}
+
+	// Avoid printing Newline
+	if (*txtBuf != 0x0A){
+
+	chOff = (*txtBuf - 0x20) * 8;// calculate char offset (fist 8 pixel of character)
+
+	for(uint8_t i=0;i < 8;i++){// Copy the inverted color px to buffer
+	chBuf[i] = ~font8x8_basic[i + chOff];
+	}
+
+	SM_loadPart((uint8_t *)chBuf, Xcol, YLine, 1, 8);// Align the char with the 8n pixels
+
+	txtBuf++;// move to next char
+	Xcol++;// move cursor to next column
+	}
+  }
 }
 
 void SwitchTF(void) __interrupt(7){// Interrupt Vector Number 7 (take a look at Datasheet, Deffinitely difference)
