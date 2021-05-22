@@ -12,7 +12,7 @@ void option_bytes_unlock() {
 	FLASH_CR2 |= (1 << FLASH_CR2_OPT);
 }
 
-// Enable write protection too EEPROM.
+// Enable write protection to EEPROM.
 void eeprom_lock() {
 	FLASH_IAPSR &= ~(1 << FLASH_IAPSR_DUL);
 }
