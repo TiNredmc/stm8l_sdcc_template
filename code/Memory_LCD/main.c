@@ -37,12 +37,12 @@
 
 /* [W.I.P] */
 //Using Flash space from UBC area, offset at page 110 (using 18 pages, 64 bytes each)
-__at(0x9B7F) uint8_t DispBuf[FB_Size];// We store our data in the Flash memory (the entire screen framebuffer).
+static __at(0x9B7F) uint8_t DispBuf[FB_Size]={0};// We store our data in the Flash memory (the entire screen framebuffer).
 /* 1 byte contain 8 pixels data, using */
 /* the way that the packet is sent and how to grab the right FB data is the same as my STM32 project (on my GitHub). */
 
 //This buffer holds 1 Character bitmap image (8x8)
-static uint8_t chBuf[8];
+static uint8_t chBuf[8]={0};
 
 //These Vars required for print function
 static uint8_t YLine = 1;
@@ -175,6 +175,12 @@ void SM_periphSetup(){// Peripheral Setup. PWM, Timer and Interrupt
 
 	// lock write protection
 	RTC_WPR = 0xFF; 
+
+	// Flash De-init for re-init
+	FLASH_CR1 = 0x00;
+	FLASH_CR2 = 0x00;
+	FLASH_IAPSR = 0x40;
+	(void) FLASH_IAPSR; // DUmmy reading to clear flags
 }
 
 void SM_malloc(){//We will use very last pages on our Flash memory from page number 110 to 127	
@@ -184,7 +190,7 @@ void SM_malloc(){//We will use very last pages on our Flash memory from page num
 	while(!(FLASH_IAPSR & (1 << FLASH_IAPSR_PUL)));// wait until Flash in unlocked
 
 	for(uint16_t i=0;i < FB_Size;i++){// Fill Framebuffer with 0x01
-		DispBuf[i] = 0x01;
+		DispBuf[i] = 0x00;
 	}
 
 	while (!(FLASH_IAPSR & (1 << FLASH_IAPSR_EOP)));// Wait until data is written to Flash	
@@ -198,7 +204,9 @@ void SM_flashWrite(void *Dest, const void *Src, size_t len){// It's memcpy but F
 	FLASH_PUKR = FLASH_PUKR_KEY2;// 0xAE
 	while(!(FLASH_IAPSR & (1 << FLASH_IAPSR_PUL)));// wait until Flash in unlocked
 
-	memcpy(Dest, Src, len);
+	//memcpy(Dest, Src, len);
+	while(len--)
+		Dest = (uint8_t *)Src;	
 
 	while (!(FLASH_IAPSR & (1 << FLASH_IAPSR_EOP)));// Wait until data is written to Flash	
 
