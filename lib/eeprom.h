@@ -3,8 +3,8 @@
 
 #include "stm8l.h"
 
-#define EEPROM_START_ADDR      0x4000
-#define EEPROM_END_ADDR        0x407F
+#define EEPROM_START_ADDR      0x1000
+#define EEPROM_END_ADDR        0x10FF
 
 /* Option bytes */
 #define OPT0                   _MEM_(0x4800)
@@ -42,5 +42,8 @@ void eeprom_lock();
  * Not necessary on devices with no RWW support.
  */
 void eeprom_wait_busy();
+
+void eeprom_write(uint8_t *Buf, uint8_t offset, uint8_t len);
+void eeprom_read(uint8_t *Buf, uint8_t offset, uint8_t len);
 
 #endif /* EEPROM_H */
