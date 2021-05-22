@@ -189,11 +189,11 @@ void SM_malloc(){//We will use very last pages on our Flash memory from page num
 	FLASH_PUKR = FLASH_PUKR_KEY2;// 0xAE
 	while(!(FLASH_IAPSR & (1 << FLASH_IAPSR_PUL)));// wait until Flash in unlocked
 
-	for(uint16_t i=0;i < FB_Size;i++){// Fill Framebuffer with 0x01
+	for(uint16_t i=0;i < FB_Size;i++){// Fill Framebuffer with 0x00 (Erase buffer)
 		DispBuf[i] = 0x00;
+		while (!(FLASH_IAPSR & (1 << FLASH_IAPSR_EOP)));// Wait until data is written to Flash	
 	}
 
-	while (!(FLASH_IAPSR & (1 << FLASH_IAPSR_EOP)));// Wait until data is written to Flash	
 
 	FLASH_IAPSR &= 0xFD;// Re-lock flash (Program region) after write
 }
@@ -205,10 +205,11 @@ void SM_flashWrite(void *Dest, const void *Src, size_t len){// It's memcpy but F
 	while(!(FLASH_IAPSR & (1 << FLASH_IAPSR_PUL)));// wait until Flash in unlocked
 
 	//memcpy(Dest, Src, len);
-	while(len--)
+	while(len--){
 		Dest = (uint8_t *)Src;	
+		while (!(FLASH_IAPSR & (1 << FLASH_IAPSR_EOP)));// Wait until data is written to Flash	
+	}
 
-	while (!(FLASH_IAPSR & (1 << FLASH_IAPSR_EOP)));// Wait until data is written to Flash	
 
 	FLASH_IAPSR &= 0xFD;// Re-lock flash (Program region) after write
 }
