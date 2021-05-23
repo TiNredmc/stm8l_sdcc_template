@@ -36,7 +36,7 @@
 #define FB_Size	linebuf*DRow
 
 /* [W.I.P] */
-//Using Flash space from UBC area, offset at page 110 (using 18 pages, 64 bytes each)
+//Using Flash space from main program area, offset at page 110 (using 18 pages, 64 bytes each)
 static __at(0x9B7F) uint8_t DispBuf[FB_Size]={0};// We store our data in the Flash memory (the entire screen framebuffer).
 /* 1 byte contain 8 pixels data, using */
 /* the way that the packet is sent and how to grab the right FB data is the same as my STM32 project (on my GitHub). */
