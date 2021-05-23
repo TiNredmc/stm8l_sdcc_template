@@ -279,10 +279,10 @@ void SM_rangeUpdate(uint8_t Start, uint8_t End){// Multiple Row update from Star
 
 void SM_ScreenFill(){// Fill entire screen with black/reflective pixels
 	for(uint8_t i=0;i < linebuf;i++){
-	SendBuf[i+2] = 0xFF;//set all pixel to 1 (turn pixel to black/reflective)
+	SendBuf[i+2] = 0x00;//set all pixel to 0 (turn pixel to black/reflective)
 	}
 
-	for(uint16_t i=0;i < DRow;i++)
+	for(uint8_t i=1;i < DRow+1;i++)
 		SM_lineUpdate(i);
 }
 
