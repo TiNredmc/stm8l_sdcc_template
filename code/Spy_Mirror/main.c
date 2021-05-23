@@ -184,6 +184,9 @@ void SM_periphSetup(){// Peripheral Setup. PWM, Timer and Interrupt
 	FLASH_CR2 = 0x00;
 	FLASH_IAPSR = 0x40;
 	(void) FLASH_IAPSR; // DUmmy reading to clear flags
+
+	// Enable System interrupt
+	__asm__("rim");// enable interrupt
 }
 
 void SM_malloc(){//We will use very last pages on our Flash memory from page number 110 to 127	
@@ -202,6 +205,7 @@ void SM_malloc(){//We will use very last pages on our Flash memory from page num
 }
 
 void SM_flashWrite(void *Dest, const void *Src, size_t len){// It's memcpy but Flash friendly
+	__asm__("sim");// Pause any interrupt
 	// Flash unlock (Program region not EEPROM (data) region)
 	FLASH_PUKR = FLASH_PUKR_KEY1;// 0x56
 	FLASH_PUKR = FLASH_PUKR_KEY2;// 0xAE
@@ -215,9 +219,11 @@ void SM_flashWrite(void *Dest, const void *Src, size_t len){// It's memcpy but F
 
 
 	FLASH_IAPSR &= 0xFD;// Re-lock flash (Program region) after write
+	__asm__("rim");// resume interrupt
 }
 
 void SM_sendByte(uint8_t *dat, size_t len){// SPI bit banging (will use SPI+DMA later)
+	__asm__("sim");// Pause any interrupt
 #ifdef HWSPI
 	while(len--){
 		SPI1_DR = (uintptr_t)dat;
@@ -234,6 +240,7 @@ void SM_sendByte(uint8_t *dat, size_t len){// SPI bit banging (will use SPI+DMA 
 	dat++;
 	}
 #endif	
+	__asm__("sim");// Pause any interrupt
 }
 
 void SM_lineUpdate(uint8_t line){// Single Row display update
@@ -254,6 +261,8 @@ void SM_rangeUpdate(uint8_t Start, uint8_t End){// Multiple Row update from Star
 	SendBuf[0] = 0x01;// Display update Command
 	SendBuf[1] = Start;
 
+	__asm__("sim");// Pause any interrupt
+
 	PB_ODR |= (1 << SCS);// Start transmission
 
 	for(;End >= Start; End--){
@@ -264,6 +273,7 @@ void SM_rangeUpdate(uint8_t Start, uint8_t End){// Multiple Row update from Star
 	SM_sendByte((uint8_t *)(0x00),2);// Send two dummy bytes to mark as end of transmission
 
 	PB_ODR &= (0 << SCS);// End transmission
+	__asm__("sim");// Pause any interrupt
 }
 
 void SM_ScreenFill(){// Fill entire screen with black/reflective pixels
@@ -359,7 +369,6 @@ void main() {
 	SM_ScreenFill();
 	CloakState = true;
 	PC_ODR |= (1 << 6);
-	__asm__("rim");// enable interrupt
 	//after Cloaking done, We put CPU to Sleep
 	//__asm__("wfi");// wait for interrupt A.K.A CPU sleep zZzZ
 	while (1) {
