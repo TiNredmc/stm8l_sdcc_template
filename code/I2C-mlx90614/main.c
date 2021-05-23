@@ -1,3 +1,6 @@
+/* Example Code interfacing with MLX90614 on STM8L
+ * Coded by TinLethax
+ */
 #include <stm8l.h>
 #include <stdint.h>
 #include <stdio.h>

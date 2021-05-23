@@ -1,3 +1,7 @@
+/* Simple GPIO input example
+ * Coded by TinLethax
+ */
+
 #include <stm8l.h>
 
 #define LED_PIN     4 //PB4 

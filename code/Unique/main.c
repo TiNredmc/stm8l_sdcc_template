@@ -1,3 +1,6 @@
+/* Unique ID read out example code
+ * Coded by TinLethax
+ */
 #include <stdint.h>
 #include <stdio.h>
 #include <string.h>

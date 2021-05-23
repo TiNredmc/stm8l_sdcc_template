@@ -69,9 +69,12 @@ void SM_GPIOsetup(){// GPIO Setup
 	PB_CR2 |= (1 << EXTCOM);// fast mode
 
 	// Wake Up Interrupt pin
-	PD_DDR |= (0 << BTN);// init pin PD5 as input
+	PD_DDR &= (0 << BTN);// init pin PD5 as input
 	PD_CR1 |= (1 << BTN);// Input pullup
 	PD_CR2 |= (1 << BTN);// interrupt
+
+	PC_DDR |= (1 << 4) | (1 << 5) | (1 << 6);
+	PC_CR1 &= (0 << 4) | (0 << 5) | (0 << 6);
 }	
 
 void SM_periphSetup(){// Peripheral Setup. PWM, Timer and Interrupt
@@ -312,12 +315,12 @@ void SM_loadPart(uint8_t* BMP, uint8_t Xcord, uint8_t Ycord, uint8_t bmpW, uint8
 //Print 8x8 Text on screen
 void SM_Print(unsigned char *txtBuf){
 uint16_t chOff = 0;
-
+uint8_t yl = YLine;
 while (*txtBuf){
 	// In case of reached 10 chars or newline detected , Do the newline. Two characters are separated by 1 pixel 
 	if ((Xcol > 10) || *txtBuf == 0x0A){
 		Xcol = 1;// Move cursor to most left
-		YLine += 8;// enter new line
+		yl += 8;// enter new line
 		txtBuf++;// move to next char
 	}
 
@@ -330,13 +333,14 @@ while (*txtBuf){
 	chBuf[i] = ~font8x8_basic[i + chOff];
 	}
 
-	SM_loadPart((uint8_t *)chBuf, Xcol, YLine, 1, 8);// Align the char with the 8n pixels
+	SM_loadPart((uint8_t *)chBuf, Xcol, yl, 1, 8);// Align the char with the 8n pixels
 
 	txtBuf++;// move to next char
 	Xcol++;// move cursor to next column
 	}
   }
 
+	SM_rangeUpdate(YLine, yl);// Update only 8n Lines (Heigth of pixels plus enter newline)
 }
 
 void SwitchTF(void) __interrupt(7){// Interrupt Vector Number 7 (take a look at Datasheet, Deffinitely difference)
@@ -354,17 +358,22 @@ void main() {
 	//Disguise as a mirror.
 	SM_ScreenFill();
 	CloakState = true;
+	PC_ODR |= (1 << 6);
 	__asm__("rim");// enable interrupt
 	//after Cloaking done, We put CPU to Sleep
-	__asm__("wfi");// wait for interrupt A.K.A CPU sleep zZzZ
+	//__asm__("wfi");// wait for interrupt A.K.A CPU sleep zZzZ
 	while (1) {
 		if(CloakState){
 		//Disguise as a Mirror
 		SM_ScreenFill();
+		PC_ODR |= (1 << 5);
+		PC_ODR &= (0 << 4);
 		}else{
 		//Do Spy Stuff
 		SM_ScreenClear();
-		/* [W.I.P] 
+		PC_ODR |= (1 << 4);
+		PC_ODR &= (0 << 5);
+		/* [W.I.P]
 		Possible feature here 
 		- RTC clock and calendar
 		- secret messages (bitmap font implementation)
@@ -373,7 +382,6 @@ void main() {
 		*/
 		while(!CloakState){
 			SM_Print("Hello world!");
-
 		}
 
 		}

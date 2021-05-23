@@ -1,3 +1,7 @@
+/* EEPROM read / write example 
+ * Coded by TinLethax
+ */
+
 #include <stdint.h>
 #include <stm8l.h>
 #include <delay.h>

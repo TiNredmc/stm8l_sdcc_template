@@ -1,4 +1,7 @@
-/* This is example 1 second LED blinking, delay with precise TIM4*/ 
+/* This is example 1 second LED blinking, delay with precise TIM4
+ * Coded by TinLethax
+ */
+
 #include <stdint.h>
 #include <stm8l.h>
 #include <delaytim4.h>

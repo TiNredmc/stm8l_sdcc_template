@@ -1,5 +1,6 @@
-/* Example for the USART communication */
-
+/* Example for the USART communication 
+ * Coded by TinLethax
+ */
 #include <stdint.h>
 #include <stdio.h>
 #include <string.h>

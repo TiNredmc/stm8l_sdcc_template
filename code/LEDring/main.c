@@ -1,3 +1,6 @@
+/* GPIOs manipulation for driving Circular ring LED found on eBay and Aliexpress
+ * Coded by TinLethax
+ */
 #include <stdint.h>
 #include <stm8l.h>
 #include <delay.h>
