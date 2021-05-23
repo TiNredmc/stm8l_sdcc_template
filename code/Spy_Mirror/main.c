@@ -219,28 +219,29 @@ void SM_flashWrite(void *Dest, const void *Src, size_t len){// It's memcpy but F
 
 
 	FLASH_IAPSR &= 0xFD;// Re-lock flash (Program region) after write
-	__asm__("rim");// resume interrupt
+	__asm__("rim");// Resume system interrupt
 }
 
 void SM_sendByte(uint8_t *dat, size_t len){// SPI bit banging (will use SPI+DMA later)
 	__asm__("sim");// Pause any interrupt
 #ifdef HWSPI
 	while(len--){
-		SPI1_DR = (uintptr_t)dat;
+		SPI1_DR = *dat;
 		while (!(SPI1_SR & (1 << SPI1_SR_TXE)));
 	dat++;
 	}
+	while (SPI1_SR & (1 << 7));// wait until we are not busy 
 #else	
 	while(len--){
 		for(uint8_t j=8; j == 0;j--){// (LSB first)
 		PB_ODR |= (1 << SCK); // _/
-		PB_ODR = (((uintptr_t)dat << (j-1)) << SDO); // 1/0 (LSB first)
+		PB_ODR = (((uint8_t *)dat << (j-1)) << SDO); // 1/0 (LSB first)
 		PB_ODR &= (0 << SCK);// \_
 		}
 	dat++;
 	}
 #endif	
-	__asm__("sim");// Pause any interrupt
+	__asm__("rim");// Resume system interrupt
 }
 
 void SM_lineUpdate(uint8_t line){// Single Row display update
@@ -273,7 +274,7 @@ void SM_rangeUpdate(uint8_t Start, uint8_t End){// Multiple Row update from Star
 	SM_sendByte((uint8_t *)(0x00),2);// Send two dummy bytes to mark as end of transmission
 
 	PB_ODR &= (0 << SCS);// End transmission
-	__asm__("sim");// Pause any interrupt
+	__asm__("rim");// Resume system interrupt
 }
 
 void SM_ScreenFill(){// Fill entire screen with black/reflective pixels
