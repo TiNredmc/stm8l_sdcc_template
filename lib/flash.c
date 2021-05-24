@@ -14,7 +14,7 @@ void flash_lock() {
 
 // Wait for Writing complete flag before next byte erase / write.
 void flash_wait_busy() {
-	while (!(FLASH_IAPSR & 0x03));
+	while (!(FLASH_IAPSR & (1 << FLASH_IAPSR_EOP)));
 }
 
 /* Parameter descriptions
@@ -25,14 +25,12 @@ void flash_wait_busy() {
 void flash_write(uint8_t *Buf, uint8_t offset, uint8_t len){
 	uint8_t *fl;
 	fl = (uint8_t *)FLASH_START_ADDR + offset;
-	flash_unlock();// Unlock Flash
 
 	while(len--){
 	*fl++ = *Buf++;
 	flash_wait_busy();
 	}
 
-	flash_lock();// Lock Flash
 }
 
 /* Parameter descriptions
