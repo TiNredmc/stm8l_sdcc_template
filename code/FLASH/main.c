@@ -11,6 +11,7 @@
 #include <usart.h>
 
 unsigned char txtBuf[9] = "LoveCat69";
+unsigned char txtBuf2[9] = "TinLethax";
 unsigned char readBuf[9] = {0};
 
 uint16_t REMAP_Pin = 0x011C; 
@@ -39,9 +40,17 @@ void main() {
 	printf("The read out is : ");	
 	
 	flash_read(readBuf, 0x969F - 0x8000, 9);// Read from offset = 0x969F
-	printf("%.9s", readBuf);
+	printf("%.9s\n", readBuf);
+
+	flash_write(txtBuf2, 0x969F - 0x8000, 9);// Write from txtBuf at offset = 0x969F (the actual flash off is 0x8000)
+
+	printf("Flash wrote!\n");
+	printf("The read out is : ");	
 	
-	printf("\nDONE");
+	flash_read(readBuf, 0x969F - 0x8000, 9);// Read from offset = 0x969F
+	printf("%.9s\n", readBuf);
+	
+	printf("DONE");
 	
     while (1) {
 
