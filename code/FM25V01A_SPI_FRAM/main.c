@@ -2,6 +2,10 @@
  * Coded by TinLethax 2021/05/25
  */
 
+/* Possible replacement
+ * MB85RS128B (Fujitsu)
+ */
+
 #include <stm8l.h>
 #include <spi.h>
 #include <stdint.h>
