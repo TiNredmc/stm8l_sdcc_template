@@ -51,6 +51,10 @@ uint8_t match_data[9];// store the received device ID (for debugging).
 // Status Register storing
 uint8_t FMstat = 0;// buffer for status register
 
+// Buffer for reading (for example)
+uint8_t exmBuf[10];
+
+// usart print function
 void prntf(char *p){
 	while(*p){
 		usart_write(*p++);
@@ -202,6 +206,15 @@ void main(){
 	FM25_unlock();// Unlock F-RAM, ready to write anytime.
 	}
 
+	prntf("Start writing...\n");
+	FM25_writeBuf("TinLethax!", 0x1234, 10);// Write "TinLethax!" to offset 0x1234 on the flash
+	prntf("Done\n");
+	prntf("Start reading...\n");
+	FM25_readBuf(exmBuf, 0x1234, 10);
+	prntf("Done\n");
+	prntf("readback is :");
+	prntf(exmBuf);
+	prntf("\nDone");
 	while(1){
 	
 
