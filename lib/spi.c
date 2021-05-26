@@ -16,8 +16,9 @@ void SPI_Init(uint8_t spi_speed) {
 	PB_DDR &= (0 << 7);// MISO pin is input
 	PB_CR1 |= (1 << 7);// with nice internal pull-up
 
-	SPI1_CR1 = (1 << SPI1_CR1_MSTR) | (1 << SPI1_CR1_BR1) | (spi_speed << 3);
-	SPI1_CR2 = (1 << SPI1_CR2_SSM) | (1 << SPI1_CR2_SSI) | (1 << SPI1_CR2_BDM) | (1 << SPI1_CR2_BDOE);
+	SPI1_CR1 |= (1 << SPI1_CR1_MSTR) | (spi_speed << 3);
+	SPI1_CR2 |= (1 << SPI1_CR2_SSM) | (1 << SPI1_CR2_SSI);
+	SPI1_CR2 &= (0 << SPI1_CR2_BDM);
 	SPI1_CR1 |= (1 << 6);// Enable SPI1 
 }
 
