@@ -31,5 +31,7 @@ void SPI_Read(uint8_t *data, size_t len);
 
 void SPI_WriteThenRead(uint8_t *TXbuf, uint8_t *RXbuf, size_t RXlen);
 
+void SPI_WriteThenWrite(uint8_t *CMD, uint8_t *TXbuf, size_t TXlen);
+
 #endif /* SPI_H */
 
