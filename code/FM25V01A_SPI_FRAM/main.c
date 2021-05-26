@@ -12,9 +12,14 @@
 #include <stdio.h>
 #include <stdbool.h>
 #include <string.h>
+#include <usart.h>
+#include <delay.h>
 
 //Define CS pin
 #define SCS	4 // PB4 as a CS pin
+
+// USART pin remap
+uint16_t REMAP_Pin = 0x011C;
 
 // Opcode (commands)
 uint8_t FM25_FSTRD 	= 0x0B;// Fast Read memory data
@@ -33,7 +38,7 @@ uint8_t FM25_WREN	= 0x06;// Set write enable latch
 
 uint8_t FM25_WRITE	= 0x02;// Write memory data 
 
-uint8_t FM25_WRSR	= 0x01;// Werite Status Register
+uint8_t FM25_WRSR	= 0x01;// Write Status Register
 
 // Device ID of FM25V01A
 const uint8_t FMID[9] = {
@@ -41,6 +46,16 @@ const uint8_t FMID[9] = {
 	0x7f,0x7f,0x7f,
 	0xC2,0x21,0x08
 };
+uint8_t match_data[9];// store the received device ID (for debugging).
+
+// Status Register storing
+uint8_t FMstat = 0;// buffer for status register
+
+void prntf(char *p){
+	while(*p){
+		usart_write(*p++);
+	}
+}
 
 // Initialize PB4 as Chip select pin 
 void setpin(){
@@ -56,7 +71,7 @@ void setpin(){
  */
 void FM25_checkSR(uint8_t *RSR){
 	PB_ODR &= (0 << SCS);// \_
-	SPI_WriteThenRead((uint8_t *)FM25_RDSR, RSR, 1);
+	SPI_WriteThenRead(&FM25_RDSR, RSR, 1);
 	PB_ODR |= (1 << SCS);// _/
 }
 
@@ -74,6 +89,33 @@ void FM25_writeSR(uint8_t *RSR){
 	SPI_Write(wrtSR, 2);
 	PB_ODR |= (1 << SCS);// _/
 }
+// Write enable latch (unlock once, write as many times as you want ;D)
+void FM25_unlock(){
+	// Write command to unlock write protection
+	PB_ODR &= (0 << SCS);// \_
+	SPI_Write(&FM25_WREN, 1);
+	PB_ODR |= (1 << SCS);// _/
+	
+	// Wait until WEL bit is set in the status register
+	do{
+	FM25_checkSR(&FMstat);
+	}while(!(FMstat & (1 << 1)));
+
+}
+
+// Disable write enable latch (lock once, no write allowed !)
+void FM25_lock(){
+	// Write command to lock write protection
+	PB_ODR &= (0 << SCS);// \_
+	SPI_Write(&FM25_WRDI, 1);
+	PB_ODR |= (1 << SCS);// _/
+	
+	// Wait until WEL bit is unset in the status register
+	do{
+	FM25_checkSR(&FMstat);
+	}while((FMstat & (1 << 1)));
+
+}
 // Write data to F-RAM
 /* parameter descriptions
  * Src -> pointer to the array to be sent 
@@ -88,10 +130,7 @@ void FM25_writeBuf(uint8_t *Src, uint16_t offset, size_t len){
 	wrtBF[2]= (uint8_t)offset;
 
 	PB_ODR &= (0 << SCS);// \_
-	SPI_Write(wrtBF, 3);
-	
-	// Write data to F-RAM
-	SPI_Write(Src, len);
+	SPI_WriteThenWrite(wrtBF, Src, len);
 	PB_ODR |= (1 << SCS);// _/
 }
 
@@ -125,7 +164,7 @@ void FM25_readBuf(uint8_t *Dest, uint16_t offset, size_t len){
 // Activity that pull Chip select pin down will wake the F-RAM from sleep
 void FM25_sleep(){
 	PB_ODR &= (0 << SCS);// \_
-	SPI_Write((uint8_t *)FM25_SLEEP, 1);
+	SPI_Write(&FM25_SLEEP, 1);
 	PB_ODR |= (1 << SCS);// _/
 }
 
@@ -134,9 +173,8 @@ void FM25_sleep(){
  * 0 -> FM25V01A is not found
  */
 int FM25_devMatch(){
-	uint8_t match_data[9];
 	PB_ODR &= (0 << SCS);// \_
-	SPI_WriteThenRead((uint8_t *)FM25_RDID, match_data, 9);
+	SPI_WriteThenRead(&FM25_RDID, match_data, 9);
 	PB_ODR |= (1 << SCS);// _/
 	
 	return memcmp(match_data, FMID, 9);
@@ -144,13 +182,31 @@ int FM25_devMatch(){
 
 void main(){
 	CLK_CKDIVR = 0x00;// Don't divide the system and make it slower than 16MHz
+	usart_init(9600); // usart using baudrate at 9600
+	SYSCFG_RMPCR1 &= (uint8_t)((uint8_t)((uint8_t)REMAP_Pin << 4) | (uint8_t)0x0F); //remap the non-exit pin of Tx and Rx of the UFQFPN20 package to the exit one.
+	SYSCFG_RMPCR1 |= (uint8_t)((uint16_t)REMAP_Pin & (uint16_t)0x00F0);
+	prntf(" Starting...\n");
 	setpin();// init CS pin (using PB4 as CS pin)
 	SPI_Init(FSYS_DIV_2);// Get maximum SPI speed at SYSclock/2
-	
+	delay_ms(100);
+
 	if(FM25_devMatch()){
 	// No Device match, Check the connection ?
+	prntf("No Device match !, Please check the connection\n");
+	prntf("Device ID read out:");
+	prntf(match_data);
+	prntf("\nProgram halted!");
+	while(1);// halt the program by put into infinite loop
+	}else{
+	prntf("Device found, Unlocking...\n");
+	FM25_unlock();// Unlock F-RAM, ready to write anytime.
 	}
 
-	while(1){}
+	while(1){
+	
+
+
+
+	}
 
 }
