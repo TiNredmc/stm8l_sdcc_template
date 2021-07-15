@@ -9,8 +9,8 @@ void SPI_Init(uint8_t spi_speed) {
 	CLK_PCKENR1 |= (1 << 4);// Enable SPI1 clock
 
 	//Enable SPI I/O GPIOs
-	PB_DDR |= (1 << 5) | (1 << 6) | (1 << 4);// SCK, MOSI, CS pin are output
-	PB_CR1 |= (1 << 5) | (1 << 6) | (1 << 4);// with Push-Pull Mode
+	PB_DDR |= (1 << 5) | (1 << 6);// SCK, MOSI pin are output
+	PB_CR1 |= (1 << 5) | (1 << 6);// with Push-Pull Mode
 	PB_CR2 |= (1 << 5) | (1 << 6);// Plus HIGH SPEEEEEEDDDDDD.
 
 	PB_DDR &= (0 << 7);// MISO pin is input
