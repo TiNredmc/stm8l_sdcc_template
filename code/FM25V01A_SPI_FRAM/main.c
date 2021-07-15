@@ -55,6 +55,7 @@ uint8_t FMstat = 0;// buffer for status register
 uint8_t exmBuf[10];
 
 // usart print function
+// I don't use the printf becuase that code takes a lot of space.
 void prntf(char *p){
 	while(*p){
 		usart_write(*p++);
@@ -129,9 +130,9 @@ void FM25_lock(){
 void FM25_writeBuf(uint8_t *Src, uint16_t offset, size_t len){
 	// Store command and offset before writing to F-RAM
 	uint8_t wrtBF[3];
-	wrtBF[0]= FM25_WRITE;
-	wrtBF[1]= (uint8_t)(offset >> 8);
-	wrtBF[2]= (uint8_t)offset;
+	wrtBF[0] = FM25_WRITE;
+	wrtBF[1] = (uint8_t)(offset >> 8);
+	wrtBF[2] = (uint8_t)offset;
 
 	PB_ODR &= (0 << SCS);// \_
 	SPI_WriteThenWrite(wrtBF, Src, len);
@@ -147,9 +148,9 @@ void FM25_writeBuf(uint8_t *Src, uint16_t offset, size_t len){
 void FM25_readBuf(uint8_t *Dest, uint16_t offset, size_t len){
 	// Store command and offset before writing to F-RAM
 	uint8_t wrtBF[3];
-	wrtBF[0]= FM25_READ;
-	wrtBF[1]= (uint8_t)(offset >> 8);
-	wrtBF[2]= (uint8_t)offset;
+	wrtBF[0] = FM25_READ;
+	wrtBF[1] = (uint8_t)(offset >> 8);
+	wrtBF[2] = (uint8_t)offset;
 
 	PB_ODR &= (0 << SCS);// \_
 	// Send command and offset to F-RAM, F-RAM respond with data reading
@@ -187,7 +188,7 @@ int FM25_devMatch(){
 void main(){
 	CLK_CKDIVR = 0x00;// Don't divide the system and make it slower than 16MHz
 	usart_init(9600); // usart using baudrate at 9600
-	SYSCFG_RMPCR1 &= (uint8_t)((uint8_t)((uint8_t)REMAP_Pin << 4) | (uint8_t)0x0F); //remap the non-exit pin of Tx and Rx of the UFQFPN20 package to the exit one.
+	SYSCFG_RMPCR1 &= (uint8_t)((uint8_t)((uint8_t)REMAP_Pin << 4) | (uint8_t)0x0F); //remap the non-exit pin of Tx and Rx of the UFQFPN20 package to the exist one.
 	SYSCFG_RMPCR1 |= (uint8_t)((uint16_t)REMAP_Pin & (uint16_t)0x00F0);
 	prntf(" Starting...\n");
 	setpin();// init CS pin (using PB4 as CS pin)
