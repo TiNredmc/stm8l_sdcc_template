@@ -20,7 +20,7 @@
 #include <spi.h>
 
 // Define FM25V01A's CS pin
-#define SCS	4 // PC4 as a CS pin
+#define SCS	0 // PC4 as a CS pin
 
 // Define SUMP command for capturing 
 // From https://github.com/gillham/logic_analyzer
@@ -85,8 +85,10 @@ void IOinit(){
 	PB_CR1 = 0; // floating input
 	PB_CR2 = 0; // No interrupt
 
-	PD_DDR |= (1 << 0);
-	PD_CR1 |= (1 << 0);
+	PD_DDR |= (1 << SCS);
+	PD_CR1 |= (1 << SCS);
+
+	PD_ODR |= (1 << SCS);
 
 	//then re initialize SPI-needed pins
 	SPI_Init(FSYS_DIV_2);// Init SPI peripheral with 8MHz clock (Max speed tho).
@@ -95,9 +97,12 @@ void IOinit(){
 // usart print function
 // I don't use the printf becuase that code takes a lot of space.
 void prntf(char *p){
+	__asm__("sim");
 	while(*p){
 		usart_write(*p++);
+		__asm__("nop\n nop\n nop");
 	}
+	__asm__("rim");
 }
 
 /////////////////////////////////////////////////////////////////////////
@@ -130,20 +135,44 @@ void TIM2init(){
 /* Interrupt handler for TIM2 */
 void TIM2isr(void) __interrupt(19){// the interrupt vector is 19 (from the STM8L151F36U datasheet page 49)
 	capture = false;
+	USART1_DR = 0x69;
+	while (!(USART1_SR & (1 << USART1_SR_TC)));
 	// clear TIM2's update interrupt flag
 	TIM2_SR1 &= ~0x01;
 }
+
+/* trap the bad guy iqr */
+// I swear, I haven't turn on the USART interrupt yet
+// But It's turns out that CPU reset itself when there's no irq handler for the
+// Interrupt that I'M NOT AWARE OF (or event enable it D:).
+void usart1TX_irq(void) __interrupt(27){}
+void usart1RX_irq(void) __interrupt(28){}
 
 // ComeNCapture functions  
 
 // receive extra bytes from host after first byte command
 void cnc_getcmd(){
 	CapParam[1] = USART1_DR;
+	while (!(USART1_SR & (1 << USART1_SR_RXNE)));
 	CapParam[2] = USART1_DR;
+	while (!(USART1_SR & (1 << USART1_SR_RXNE)));
 	CapParam[3] = USART1_DR;
+	while (!(USART1_SR & (1 << USART1_SR_RXNE)));
 	CapParam[4] = USART1_DR;
+	while (!(USART1_SR & (1 << USART1_SR_RXNE)));
 }
 
+// transmit extrabyte to host, for debugging purpose only.
+void cnc_prntcmd(){
+	USART1_DR = divider >> 24;
+	while (!(USART1_SR & (1 << USART1_SR_TC)));
+	USART1_DR = divider >> 16;
+	while (!(USART1_SR & (1 << USART1_SR_TC)));
+	USART1_DR = divider >> 8;
+	while (!(USART1_SR & (1 << USART1_SR_TC)));
+	USART1_DR = divider;
+	while (!(USART1_SR & (1 << USART1_SR_TC)));
+}
 // Report Metadata to SUMP OLS
 void cnc_mtdtReport(){
 	usart_write(0x01);// name report
@@ -198,21 +227,22 @@ void cnc_capture_start(){
 	wrtBF[1] = 0;
 	wrtBF[2] = 0;
 
-	PB_ODR &= (0 << SCS);
+	prntf("capture started!\n");
+	PD_ODR &= (0 << SCS);
 
-	SPI_Write(wrtBF, 3);// start writing F-RAM at offset = 0 
+	//SPI_Write(wrtBF, 3);// start writing F-RAM at offset = 0 
 	// start counter
-	TIM2_CR1 = 0x01;
-	do{		
-	__asm__("mov 0x5204, 0x5005");// load directly from mem2mem, 1 cpu cycle
-	}while(capture);
+	//TIM2_CR1 = 0x01;
+	//do{		
+	//__asm__("mov 0x5204, 0x5005");// load directly from mem2mem, 1 cpu cycle
+	//}while(capture);
 
 	capture = true;// reset the loop value to true for next capture
 
 	// stop counter. It's auto-reset.
 	TIM2_CR1 = 0x00;
 	
-	PB_ODR |= (1 << SCS);
+	PD_ODR |= (1 << SCS);
 }
 
 // Read data back from F-RAM and Dump to USART byte per byte
@@ -222,16 +252,17 @@ void cnc_capture_readback(){
 	wrtBF[1] = 0;
 	wrtBF[2] = 0;
 	
-	PB_ODR &= (0 << SCS);
+	PD_ODR &= (0 << SCS);
 
-	SPI_Write(wrtBF, 3);
-
+	//SPI_Write(wrtBF, 3);
+	prntf("ready to send\n");
+	
 	do{
 	USART1_DR = SPI1_DR;
 	while (!(USART1_SR & (1 << USART1_SR_TC)));
 	}while(ramADDR--);
 
-	PB_ODR |= (1 << SCS);
+	PD_ODR |= (1 << SCS);
 	ramADDR = 0x3FFF;
 }
 
@@ -246,6 +277,7 @@ void main() {
 
 	IOinit();// Init the GPIOs and SPI 
 	TIM2init();// Start Timer2 
+	__asm__("rim");// start system interrupt
 	delay_ms(1000);// wait for everything stable
 
 
@@ -262,60 +294,61 @@ void main() {
 
 		case SUMP_ARM: 
 			// Arming 
- 			PD_ODR |= (1 << 0);
+			//prntf("Arm\n");
 			// Do capture stuffs 
-			if (divider == 12){// divider = 12, 8MHz divider
-			__asm__("rim");// start system interrupt
+			if (divider == 11){// divider = 11, 8MHz divider
+			//prntf("capture start\n");
+
 			// Start F-RAM writing and GPIO read 
 			cnc_capture_start();
 
-			__asm__("sim");// Stop system interrupt
+			//__asm__("sim");// Stop system interrupt
 			// Transmit F-RAM data over USART
 			cnc_capture_readback();
 			}
- 			PD_ODR &= (0 << 0);
-			prntf("Arm\n");
+			//prntf("arm done!\n");
+
 			break;
 		
 		case SUMP_TRIGGER_MASK:
 			cnc_getcmd();
 			// not implemented
-			prntf("Trigger Mask\n");
+			//prntf("Trigger Mask\n");
 			break;
 		
 		case SUMP_TRIGGER_VALUES:
 			cnc_getcmd();
 			// not implemented
-			prntf("Trigger Val\n");
+			//prntf("Trigger Val\n");
 			break;
 
 		case SUMP_TRIGGER_CONFIG:
 			cnc_getcmd();
 			// not implemented
-			prntf("Trigger Conf\n");
+			//prntf("Trigger Conf\n");
 			break;
 
 		case SUMP_SET_DIVIDER:
 			cnc_getcmd();
 
-			divider = CapParam[3];
+			divider = CapParam[4];
+			divider = divider << 8;
+			divider += CapParam[3];
 			divider = divider << 8;
 			divider += CapParam[2];
-			divider = divider << 8;
-			divider += CapParam[1];
 
 			cnc_capture_timing_setup();
-			prntf("Set Div\n");
+			//prntf("Set Div\n");
 			break;
 
 		case SUMP_SET_READ_DELAY_COUNT:
 			cnc_getcmd();
-			prntf("Read delay\n");
+			//prntf("Read delay\n");
 			break;
 
 		case SUMP_SET_FLAGS:
 			cnc_getcmd();
-			prntf("Set Flags\n");
+			//prntf("Set Flags\n");
 			break;
 	
 		case SUMP_GET_METADATA: 
