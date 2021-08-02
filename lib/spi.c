@@ -13,8 +13,9 @@ void SPI_Init(uint8_t spi_speed) {
 	PB_CR1 |= (1 << 5) | (1 << 6);// with Push-Pull Mode
 	PB_CR2 |= (1 << 5) | (1 << 6);// Plus HIGH SPEEEEEEDDDDDD.
 
-	PB_DDR &= (0 << 7);// MISO pin is input
+	PB_DDR |= (0 << 7);// MISO pin is input
 	PB_CR1 |= (1 << 7);// with nice internal pull-up
+
 
 	SPI1_CR1 |= (1 << SPI1_CR1_MSTR) | (spi_speed << 3);
 	SPI1_CR2 |= (1 << SPI1_CR2_SSM) | (1 << SPI1_CR2_SSI);
