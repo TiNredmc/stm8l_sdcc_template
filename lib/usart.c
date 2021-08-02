@@ -15,8 +15,8 @@ CLK_PCKENR1 |= (1 << (0x05 & 0x0F)); // enable USART1 clock.
   USART1_BRR2 = (uint8_t)(BaudRate_Mantissa & 0x0F) | (uint8_t)(BaudRate_Mantissa & 0xF000);
   USART1_BRR1 = (uint8_t)((BaudRate_Mantissa >> 4) & 0xFF);
     /* enable transmitter and receiver */
-    USART1_CR2 &= (0x00); //Disable it first then re-enable
-    USART1_CR2 |= 0x04 | 0x08;// add 1 to bit number 2 and 3 for enabling the Tx and Rx
+    USART1_CR2 = 0x00; //Disable it first then re-enable
+    USART1_CR2 = 0x04 | 0x08;// add 1 to bit number 2 and 3 for enabling the Tx and Rx
 }
 
 void usart_write(uint8_t data) {
