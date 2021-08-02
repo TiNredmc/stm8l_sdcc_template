@@ -58,8 +58,6 @@ uint16_t delayTime  = 0;
 /* USART */
 // pin remap
 const uint16_t REMAP_Pin = 0x011C; //constant value for sysconf to remap USART pin
-// boot text
-const static char bootText[] = {" ComeNCapture 2.0\n"};
 
 /* for FM25V01A */
 
@@ -83,9 +81,12 @@ uint16_t ramADDR = 0x3FFF;// maximum F-RAM address for roll-counting
  * Initialize PC4 as SCS pin also Init SPI stuffs too
  */
 void IOinit(){
-	PB_DDR &= 0; // set all pin at input
-	PB_CR1 &= 0; // floating input
-	PB_CR2 &= 0; // No interrupt
+	PB_DDR = 0; // set all pin at input
+	PB_CR1 = 0; // floating input
+	PB_CR2 = 0; // No interrupt
+
+	PD_DDR |= (1 << 0);
+	PD_CR1 |= (1 << 0);
 
 	//then re initialize SPI-needed pins
 	SPI_Init(FSYS_DIV_2);// Init SPI peripheral with 8MHz clock (Max speed tho).
@@ -137,16 +138,16 @@ void TIM2isr(void) __interrupt(19){// the interrupt vector is 19 (from the STM8L
 
 // receive extra bytes from host after first byte command
 void cnc_getcmd(){
-	CapParam[1] = usart_read();
-	CapParam[2] = usart_read();
-	CapParam[3] = usart_read();
-	CapParam[4] = usart_read();
+	CapParam[1] = USART1_DR;
+	CapParam[2] = USART1_DR;
+	CapParam[3] = USART1_DR;
+	CapParam[4] = USART1_DR;
 }
 
 // Report Metadata to SUMP OLS
 void cnc_mtdtReport(){
 	usart_write(0x01);// name report
-	prntf("ComeNCap");
+	prntf("ComeNCapture");
 	usart_write(0x00);// end marker
 
 	usart_write(0x02);// version report
@@ -236,56 +237,62 @@ void cnc_capture_readback(){
 
 void main() {
 	CLK_CKDIVR = 0x00;// set clock divider to 1, So we get the 16MHz for high TX rate and correct delay timing.
-	usart_init(115200);// uses baud rate of 115200
+	usart_init(38400);// uses baud rate of 38400
 
 	//remap UART hw pin to PA2 and PA3.
 	SYSCFG_RMPCR1 &= (uint8_t)((uint8_t)((uint8_t)REMAP_Pin << 4) | (uint8_t)0x0F); 
 	SYSCFG_RMPCR1 |= (uint8_t)((uint16_t)REMAP_Pin & (uint16_t)0x00F0);
-	
+	prntf(" ComeNCapture 2.0\n");// Print boot text
+
 	IOinit();// Init the GPIOs and SPI 
 	TIM2init();// Start Timer2 
-	__asm__("rim");// start interrupt system
-	delay_ms(250);// wait for everything stable
+	delay_ms(1000);// wait for everything stable
 
-	prntf(bootText);// Print boot text
 
 	while (1) {
-	if (USART1_SR & 0x20){// check if receive data is ready to be read.
-	CapParam[0] = usart_read();
+		if(USART1_SR & (1 << USART1_SR_RXNE)){// check if receive data is ready to be read.
+		CapParam[0] = USART1_DR;
 		switch (CapParam[0]){
 
 		case SUMP_QUERY: 
 			// return Query data to SUMP OLS
+			// This will be identified before start any capturing
 			prntf("1ALS");
 			break;
 
 		case SUMP_ARM: 
 			// Arming 
-			
+ 			PD_ODR |= (1 << 0);
 			// Do capture stuffs 
-			if (divider == 11){// 8MHz divider
+			if (divider == 12){// divider = 12, 8MHz divider
+			__asm__("rim");// start system interrupt
 			// Start F-RAM writing and GPIO read 
 			cnc_capture_start();
 
+			__asm__("sim");// Stop system interrupt
 			// Transmit F-RAM data over USART
 			cnc_capture_readback();
 			}
-
+ 			PD_ODR &= (0 << 0);
+			prntf("Arm\n");
 			break;
 		
 		case SUMP_TRIGGER_MASK:
 			cnc_getcmd();
 			// not implemented
+			prntf("Trigger Mask\n");
 			break;
 		
 		case SUMP_TRIGGER_VALUES:
 			cnc_getcmd();
 			// not implemented
+			prntf("Trigger Val\n");
 			break;
 
 		case SUMP_TRIGGER_CONFIG:
 			cnc_getcmd();
 			// not implemented
+			prntf("Trigger Conf\n");
 			break;
 
 		case SUMP_SET_DIVIDER:
@@ -298,14 +305,17 @@ void main() {
 			divider += CapParam[1];
 
 			cnc_capture_timing_setup();
+			prntf("Set Div\n");
 			break;
 
 		case SUMP_SET_READ_DELAY_COUNT:
 			cnc_getcmd();
+			prntf("Read delay\n");
 			break;
 
 		case SUMP_SET_FLAGS:
 			cnc_getcmd();
+			prntf("Set Flags\n");
 			break;
 	
 		case SUMP_GET_METADATA: 
@@ -315,7 +325,7 @@ void main() {
 		default:
 			break;
 		}// switch cases	
-	}// if(usart available)
+		}// if(usart available)
 	
 	}// while loop 
 }
