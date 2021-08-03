@@ -1,7 +1,6 @@
 /* ComeNCapture is a quick-n-dirty logic analyzer 
  * Coded By TinLethax 2020/05/23
- * Right now the RX part (pc -> MCU) uses the Interrupt method. In the future I will implement the DMA 
- * So I can keep the timer freely running
+ * updated 2021/07/02 -> now adding compatibilities with SUMP OLS.
  */
 /* 2021/07/15 Update
  * GPIO will only available for 5 input cahnnels only, due to SPI taking up PB5-7.
