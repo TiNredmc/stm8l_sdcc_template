@@ -19,7 +19,7 @@
 #include <spi.h>
 
 // Define FM25V01A's CS pin
-#define SCS	0 // PC4 as a CS pin
+#define SCS	0 // PD4 as a CS pin
 
 // Define SUMP command for capturing 
 // From https://github.com/gillham/logic_analyzer
@@ -84,6 +84,7 @@ void IOinit(){
 	PB_CR1 = 0; // floating input
 	PB_CR2 = 0; // No interrupt
 
+	// Setup PD0 as CS pin for SPI 
 	PD_DDR |= (1 << SCS);
 	PD_CR1 |= (1 << SCS);
 
@@ -119,13 +120,8 @@ void TIM2init(){
 	// prescaler is 2^1 = 2, which is 8MHz Timer !
 	TIM2_PSCR = 1; 
 
-	//TIM2_EGR = 0x02;
-	
 	// enable update interrupt, interrupt fire whe counter reached Auto reload value
 	TIM2_IER |= 0x01;
-
-	// Enable TIM2 peripheral
-	TIM2_BKR |= 0x80;
 
 	// We will not start counter unless we want capturing to start
 	TIM2_CR1 = 0x00;
@@ -146,7 +142,7 @@ void TIM2isr(void) __interrupt(19){// the interrupt vector is 19 (from the STM8L
 // Interrupt that I'M NOT AWARE OF (or event enable it D:).
 void usart1TX_irq(void) __interrupt(27){}
 void usart1RX_irq(void) __interrupt(28){}
-
+void spi_irq(void) __interrupt(26){}
 // ComeNCapture functions  
 
 // receive extra bytes from host after first byte command
@@ -226,15 +222,15 @@ void cnc_capture_start(){
 	wrtBF[1] = 0;
 	wrtBF[2] = 0;
 
-	prntf("capture started!\n");
+	//prntf("capture started!\n");
 	PD_ODR &= (0 << SCS);
 
-	//SPI_Write(wrtBF, 3);// start writing F-RAM at offset = 0 
+	SPI_Write(wrtBF, 3);// start writing F-RAM at offset = 0 
 	// start counter
-	//TIM2_CR1 = 0x01;
-	//do{		
-	//__asm__("mov 0x5204, 0x5005");// load directly from mem2mem, 1 cpu cycle
-	//}while(capture);
+	TIM2_CR1 = 0x01;
+	do{		
+	__asm__("mov 0x5204, 0x5005");// load directly from mem2mem, 1 cpu cycle
+	}while(capture);
 
 	capture = true;// reset the loop value to true for next capture
 
@@ -250,12 +246,13 @@ void cnc_capture_readback(){
 	wrtBF[0] = FM25_FSTRD;
 	wrtBF[1] = 0;
 	wrtBF[2] = 0;
+
 	
 	PD_ODR &= (0 << SCS);
 
-	//SPI_Write(wrtBF, 3);
-	prntf("ready to send\n");
-	
+	SPI_Write(wrtBF, 3);
+	//prntf("ready to send\n");
+
 	do{
 	USART1_DR = SPI1_DR;
 	while (!(USART1_SR & (1 << USART1_SR_TC)));
@@ -263,6 +260,7 @@ void cnc_capture_readback(){
 
 	PD_ODR |= (1 << SCS);
 	ramADDR = 0x3FFF;
+
 }
 
 void main() {
@@ -301,7 +299,6 @@ void main() {
 			// Start F-RAM writing and GPIO read 
 			cnc_capture_start();
 
-			//__asm__("sim");// Stop system interrupt
 			// Transmit F-RAM data over USART
 			cnc_capture_readback();
 			}
