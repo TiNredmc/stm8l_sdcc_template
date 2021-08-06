@@ -229,7 +229,7 @@ void cnc_capture_start(){
 	// start counter
 	TIM2_CR1 = 0x01;
 	do{		
-	__asm__("mov 0x5204, 0x5005");// load directly from mem2mem, 1 cpu cycle
+	__asm__("mov 0x5204, 0x5006");// load directly from mem2mem, 1 cpu cycle
 	}while(capture);
 
 	capture = true;// reset the loop value to true for next capture
