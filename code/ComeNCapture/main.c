@@ -130,8 +130,8 @@ void TIM2init(){
 /* Interrupt handler for TIM2 */
 void TIM2isr(void) __interrupt(19){// the interrupt vector is 19 (from the STM8L151F36U datasheet page 49)
 	capture = false;
-	USART1_DR = 0x69;
-	while (!(USART1_SR & (1 << USART1_SR_TC)));
+	//USART1_DR = 0x69;
+	//while (!(USART1_SR & (1 << USART1_SR_TC)));
 	// clear TIM2's update interrupt flag
 	TIM2_SR1 &= ~0x01;
 }
