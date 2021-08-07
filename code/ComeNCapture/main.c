@@ -68,7 +68,7 @@ const uint16_t REMAP_Pin = 0x011C; //constant value for sysconf to remap USART p
 
 // FM25V01A necessary opcode
 // Opcode (commands)
-const static uint8_t FM25_FSTRD 	= 0x0B;// Fast Read memory data
+const static uint8_t FM25_WREN		= 0x06;// Set write enable latch
 
 const static uint8_t FM25_READ		= 0x03;// Read memory data
 
@@ -333,6 +333,13 @@ void cnc_capture_readback(){
 
 }
 
+//FM25V01A : enable writing
+void FM25_unlock(){
+	PD_ODR &= ~(1 << SCS);
+	SPI_Write(&FM25_WREN, 1);
+	PD_ODR |= (1 << SCS);
+}
+
 void main() {
 	CLK_CKDIVR = 0x00;// set clock divider to 1, So we get the 16MHz for high TX rate and correct delay timing.
 	usart_init(57600);// uses baud rate of 38400
@@ -344,6 +351,7 @@ void main() {
 
 	IOinit();// Init the GPIOs and SPI 
 	TIM2init();// Start Timer2 
+	FM25_unlock();// Unlock write protection of FM25V01A
 	__asm__("rim");// start system interrupt
 	delay_ms(1000);// wait for everything stable
 
