@@ -47,10 +47,13 @@
 #define SUMP_GET_METADATA 0x04
 
 /*capture mode*/
-#define CAP8M 8
-#define CAP4M 4
-#define CAP2M 2
-#define CAP1M 1
+#define CAP8M 	8
+#define CAP4M 	4
+#define CAP2M 	2
+#define CAP1M 	1
+#define CAP500K 50
+#define CAP200K	20
+#define CAP100K	10
 
 // For incoming capture command/params
 uint8_t CapParam[5];// capture parameter received from host PC running SUMP OLS
@@ -149,7 +152,10 @@ void TIM2_capture(uint8_t pscr){
 	// pscr = 1 -> 8MHz capturing 
 	// pscr = 2 -> 4MHz capturing
 	// pscr = 3 -> 2MHz capturing
-	// pscr = 4 -> 1MHz Capturing
+	// pscr = 4 -> 1MHz capturing
+	// pscr = 5 -> 500KHz capturing 
+	// pscr = 6 -> 200KHz capturing
+	// pscr = 7 -> 100KHz capturing 
 	TIM2_PSCR = pscr;
 
 	// Clear prescaler everytime after counter reach ARR value.
@@ -301,6 +307,88 @@ void cnc_capture_start(uint8_t samspd){
 		TIM2_CR1 = 0x00;
 		break;
 		
+	case CAP500K:
+		// start counter
+		TIM2_CR1 = 0x01;
+		do{		
+		__asm__("mov 0x5204, 0x5006");// load directly from mem2mem, 1 cpu cycle
+		__asm__("nop\n nop\n nop\n nop\n");
+		__asm__("nop\n nop\n nop\n nop\n");
+		__asm__("nop\n nop\n nop\n nop\n");
+		__asm__("nop\n nop\n nop\n nop\n");
+		__asm__("nop\n nop\n nop\n nop\n");
+		__asm__("nop\n nop\n nop\n nop\n");
+		__asm__("nop\n nop\n nop\n nop\n");
+		}while(capture);
+		// stop counter. It's auto-reset.
+		TIM2_CR1 = 0x00;
+		break;
+	
+	case CAP200K:
+		// start counter
+		TIM2_CR1 = 0x01;
+		do{		
+		__asm__("mov 0x5204, 0x5006");// load directly from mem2mem, 1 cpu cycle
+		__asm__("nop\n nop\n nop\n nop\n");
+		__asm__("nop\n nop\n nop\n nop\n");
+		__asm__("nop\n nop\n nop\n nop\n");
+		__asm__("nop\n nop\n nop\n nop\n");
+		__asm__("nop\n nop\n nop\n nop\n");
+		__asm__("nop\n nop\n nop\n nop\n");
+		__asm__("nop\n nop\n nop\n nop\n");
+		__asm__("nop\n nop\n nop\n nop\n");
+		__asm__("nop\n nop\n nop\n nop\n");
+		__asm__("nop\n nop\n nop\n nop\n");
+		__asm__("nop\n nop\n nop\n nop\n");
+		__asm__("nop\n nop\n nop\n nop\n");
+		__asm__("nop\n nop\n nop\n nop\n");
+		__asm__("nop\n nop\n nop\n nop\n");
+		__asm__("nop\n nop\n nop\n nop\n");
+		}while(capture);
+		// stop counter. It's auto-reset.
+		TIM2_CR1 = 0x00;
+		break;
+	
+	case CAP100K:
+		// start counter
+		TIM2_CR1 = 0x01;
+		do{		
+		__asm__("mov 0x5204, 0x5006");// load directly from mem2mem, 1 cpu cycle
+		__asm__("nop\n nop\n nop\n nop\n");
+		__asm__("nop\n nop\n nop\n nop\n");
+		__asm__("nop\n nop\n nop\n nop\n");
+		__asm__("nop\n nop\n nop\n nop\n");
+		__asm__("nop\n nop\n nop\n nop\n");
+		__asm__("nop\n nop\n nop\n nop\n");
+		__asm__("nop\n nop\n nop\n nop\n");
+		__asm__("nop\n nop\n nop\n nop\n");
+		__asm__("nop\n nop\n nop\n nop\n");
+		__asm__("nop\n nop\n nop\n nop\n");
+		__asm__("nop\n nop\n nop\n nop\n");
+		__asm__("nop\n nop\n nop\n nop\n");
+		__asm__("nop\n nop\n nop\n nop\n");
+		__asm__("nop\n nop\n nop\n nop\n");
+		__asm__("nop\n nop\n nop\n nop\n");
+		__asm__("nop\n nop\n nop\n nop\n");
+		__asm__("nop\n nop\n nop\n nop\n");
+		__asm__("nop\n nop\n nop\n nop\n");
+		__asm__("nop\n nop\n nop\n nop\n");
+		__asm__("nop\n nop\n nop\n nop\n");
+		__asm__("nop\n nop\n nop\n nop\n");
+		__asm__("nop\n nop\n nop\n nop\n");
+		__asm__("nop\n nop\n nop\n nop\n");
+		__asm__("nop\n nop\n nop\n nop\n");
+		__asm__("nop\n nop\n nop\n nop\n");
+		__asm__("nop\n nop\n nop\n nop\n");
+		__asm__("nop\n nop\n nop\n nop\n");
+		__asm__("nop\n nop\n nop\n nop\n");
+		__asm__("nop\n nop\n nop\n nop\n");
+		__asm__("nop\n nop\n nop\n nop\n");
+		}while(capture);
+		// stop counter. It's auto-reset.
+		TIM2_CR1 = 0x00;
+		break;
+		
 	default:
 		break;
 	}
@@ -342,7 +430,7 @@ void FM25_unlock(){
 
 void main() {
 	CLK_CKDIVR = 0x00;// set clock divider to 1, So we get the 16MHz for high TX rate and correct delay timing.
-	usart_init(57600);// uses baud rate of 38400
+	usart_init(57600);// uses baud rate of 57600
 
 	//remap UART hw pin to PA2 and PA3.
 	SYSCFG_RMPCR1 &= (uint8_t)((uint8_t)((uint8_t)REMAP_Pin << 4) | (uint8_t)0x0F); 
@@ -401,13 +489,40 @@ void main() {
 			
 			}else if (divider == 99){// divider = 99, 1MHz capture
 			// Setup timer2 
-			TIM2_capture(3);
+			TIM2_capture(4);
 			// Start F-RAM writing and GPIO read 
 			cnc_capture_start(CAP2M);
 
 			// Transmit F-RAM data over USART
 			cnc_capture_readback();
 			
+			}else if (divider == 199){// divier = 199, 500KHz capture 
+			// Setup timer2 
+			TIM2_capture(5);
+			// Start F-RAM writing and GPIO read 
+			cnc_capture_start(CAP500K);
+
+			// Transmit F-RAM data over USART
+			cnc_capture_readback();
+				
+			}else if (divider == 499){// divier = 499, 200KHz capture 
+			// Setup timer2 
+			TIM2_capture(6);
+			// Start F-RAM writing and GPIO read 
+			cnc_capture_start(CAP200K);
+
+			// Transmit F-RAM data over USART
+			cnc_capture_readback();
+				
+			}else if (divider == 999){// divier = 999, 100KHz capture 
+			// Setup timer2 
+			TIM2_capture(7);
+			// Start F-RAM writing and GPIO read 
+			cnc_capture_start(CAP100K);
+
+			// Transmit F-RAM data over USART
+			cnc_capture_readback();
+					
 			}
 			//prntf("arm done!\n");
 
