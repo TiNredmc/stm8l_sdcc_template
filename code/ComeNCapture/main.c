@@ -46,6 +46,12 @@
 #define SUMP_SELF_TEST 0x03
 #define SUMP_GET_METADATA 0x04
 
+/*capture mode*/
+#define CAP8M 8
+#define CAP4M 4
+#define CAP2M 2
+#define CAP1M 1
+
 // For incoming capture command/params
 uint8_t CapParam[5];// capture parameter received from host PC running SUMP OLS
 
@@ -114,11 +120,11 @@ void TIM2init(){
 	// auto reload when counter reach 0x3FFF
 	// this will trigger interrupt to change state that while loop checks
 	// so we can stop the cnc_capture_start's while loop
-	TIM2_ARRH = 0x03;
-	TIM2_ARRL = 0xFF;
+	//TIM2_ARRH = 0x03;
+	//TIM2_ARRL = 0xFF;
 
 	// prescaler is 2^1 = 2, which is 8MHz Timer !
-	TIM2_PSCR = 1; 
+	//TIM2_PSCR = 1; 
 
 	// enable update interrupt, interrupt fire whe counter reached Auto reload value
 	TIM2_IER |= 0x01;
@@ -127,6 +133,29 @@ void TIM2init(){
 	TIM2_CR1 = 0x00;
 }
 
+/* re init the TIM2 everytime before capturing. */
+void TIM2_capture(uint8_t pscr){
+	// auto reload when counter reach 0x3FFF
+	// this will trigger interrupt to change state that while loop checks
+	// so we can stop the cnc_capture_start's while loop
+	TIM2_ARRH = 0x03;
+	TIM2_ARRL = 0xFF;
+
+	// prescaler is used for dividing System clock (16MHz)
+	// for running the counter at certain speed
+	// Can be calculated by F_SYS/(2 ^ TIM2_PSCR) (floor value, integer only, ignore decimal).
+	
+	// pscr = 0 -> 2^0 = 1 pactically no divider (16MHz)
+	// pscr = 1 -> 8MHz capturing 
+	// pscr = 2 -> 4MHz capturing
+	// pscr = 3 -> 2MHz capturing
+	// pscr = 4 -> 1MHz Capturing
+	TIM2_PSCR = pscr;
+
+	// Clear prescaler everytime after counter reach ARR value.
+	TIM2_EGR = 0x01;// event source update 	
+}
+ 
 /* Interrupt handler for TIM2 */
 void TIM2isr(void) __interrupt(19){// the interrupt vector is 19 (from the STM8L151F36U datasheet page 49)
 	capture = false;
@@ -216,7 +245,7 @@ void cnc_capture_timing_setup(){
 }
 
 // Start capturing 
-void cnc_capture_start(){
+void cnc_capture_start(uint8_t samspd){
 	uint8_t wrtBF[3];
 	wrtBF[0] = FM25_WRITE;
 	wrtBF[1] = 0;
@@ -226,17 +255,58 @@ void cnc_capture_start(){
 	PD_ODR &= (0 << SCS);
 
 	SPI_Write(wrtBF, 3);// start writing F-RAM at offset = 0 
-	// start counter
-	TIM2_CR1 = 0x01;
-	do{		
-	__asm__("mov 0x5204, 0x5006");// load directly from mem2mem, 1 cpu cycle
-	}while(capture);
 
+	switch(samspd){
+	case CAP8M:
+		// start counter
+		TIM2_CR1 = 0x01;
+		do{		
+		__asm__("mov 0x5204, 0x5006");// load directly from mem2mem, 1 cpu cycle
+		}while(capture);
+		// stop counter. It's auto-reset.
+		TIM2_CR1 = 0x00;
+		break;
+		
+	case CAP4M:
+		// start counter
+		TIM2_CR1 = 0x01;
+		do{		
+		__asm__("mov 0x5204, 0x5006");// load directly from mem2mem, 1 cpu cycle
+		}while(capture);
+		// stop counter. It's auto-reset.
+		TIM2_CR1 = 0x00;
+		break;
+		
+	case CAP2M:
+		// start counter
+		TIM2_CR1 = 0x01;
+		do{		
+		__asm__("mov 0x5204, 0x5006");// load directly from mem2mem, 1 cpu cycle
+		__asm__("nop\n nop\n nop\n nop\n");
+		}while(capture);
+		// stop counter. It's auto-reset.
+		TIM2_CR1 = 0x00;
+		break;
+		
+	case CAP1M:
+		// start counter
+		TIM2_CR1 = 0x01;
+		do{		
+		__asm__("mov 0x5204, 0x5006");// load directly from mem2mem, 1 cpu cycle
+		__asm__("nop\n nop\n nop\n nop\n");
+		__asm__("nop\n nop\n nop\n nop\n");
+		__asm__("nop\n nop\n nop\n nop\n");
+		}while(capture);
+		// stop counter. It's auto-reset.
+		TIM2_CR1 = 0x00;
+		break;
+		
+	default:
+		break;
+	}
+	
 	capture = true;// reset the loop value to true for next capture
 
-	// stop counter. It's auto-reset.
-	TIM2_CR1 = 0x00;
-	
 	PD_ODR |= (1 << SCS);
 }
 
@@ -265,7 +335,7 @@ void cnc_capture_readback(){
 
 void main() {
 	CLK_CKDIVR = 0x00;// set clock divider to 1, So we get the 16MHz for high TX rate and correct delay timing.
-	usart_init(38400);// uses baud rate of 38400
+	usart_init(57600);// uses baud rate of 38400
 
 	//remap UART hw pin to PA2 and PA3.
 	SYSCFG_RMPCR1 &= (uint8_t)((uint8_t)((uint8_t)REMAP_Pin << 4) | (uint8_t)0x0F); 
@@ -293,14 +363,43 @@ void main() {
 			// Arming 
 			//prntf("Arm\n");
 			// Do capture stuffs 
-			if (divider == 11){// divider = 11, 8MHz divider
+			if (divider == 11){// divider = 11, 8MHz capture
 			//prntf("capture start\n");
-
+			// Setup timer2 
+			TIM2_capture(1);
 			// Start F-RAM writing and GPIO read 
-			cnc_capture_start();
+			cnc_capture_start(CAP8M);
 
 			// Transmit F-RAM data over USART
 			cnc_capture_readback();
+			
+			} else if (divider == 24){// divider = 24, 4MHz capture
+			// Setup timer2 
+			TIM2_capture(2);
+			// Start F-RAM writing and GPIO read 
+			cnc_capture_start(CAP4M);
+
+			// Transmit F-RAM data over USART
+			cnc_capture_readback();
+			
+			}else if (divider == 49){// divider = 49, 2MHz capture
+			// Setup timer2 
+			TIM2_capture(3);
+			// Start F-RAM writing and GPIO read 
+			cnc_capture_start(CAP2M);
+
+			// Transmit F-RAM data over USART
+			cnc_capture_readback();
+			
+			}else if (divider == 99){// divider = 99, 1MHz capture
+			// Setup timer2 
+			TIM2_capture(3);
+			// Start F-RAM writing and GPIO read 
+			cnc_capture_start(CAP2M);
+
+			// Transmit F-RAM data over USART
+			cnc_capture_readback();
+			
 			}
 			//prntf("arm done!\n");
 
