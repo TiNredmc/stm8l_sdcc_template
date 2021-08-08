@@ -29,7 +29,7 @@ void SPI_Init(uint8_t spi_speed) {
  * len -> lenght (size) of receive byte(s)
  */
 void SPI_Read(uint8_t *data, size_t len) {
-    SPI_Write((uint8_t *)0xFF, 1);
+    //SPI_Write((uint8_t *)0xFF, 1);
 
 	while(len--){
 		while (!(SPI1_SR & (1 << SPI1_SR_RXNE)));
