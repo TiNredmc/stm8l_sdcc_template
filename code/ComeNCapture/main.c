@@ -82,6 +82,10 @@ static bool capture = true;
 
 // F-RAM address counter keeper for reading and slow write 
 uint16_t ramADDR = 0x3FFF;// maximum F-RAM address for roll-counting 
+// Related with Sample size for capturing speed lower than 100KHz 
+// (that will make more sense as lower the speed, longer it takes to fills 16KBytes).
+uint16_t readCount = 0x3FFF;
+uint16_t delayCount = 0;
 
 /////////////////////////////////////////////////////////////////////////
 ///////// Normal I/O stuffs /////////////////////////////////////////////
@@ -421,6 +425,30 @@ void cnc_capture_readback(){
 
 }
 
+// Read data back from F-RAM and Dump to USART byte per byte
+// But with variable sample size. (for capture speed < 100KHz).
+void cnc_lowcapture_readback(){
+	readCount--;// decrease 1 step for while loop
+	
+	uint8_t wrtBF[3];
+	wrtBF[0] = FM25_READ;
+	wrtBF[1] = 0;
+	wrtBF[2] = 0;
+
+	
+	PD_ODR &= (0 << SCS);
+
+	SPI_Write(wrtBF, 3);
+	//prntf("ready to send\n");
+
+	do{
+	USART1_DR = SPI1_DR;
+	while (!(USART1_SR & (1 << USART1_SR_TC)));
+	}while(readCount--);
+
+	PD_ODR |= (1 << SCS);
+}
+
 //FM25V01A : enable writing
 void FM25_unlock(){
 	PD_ODR &= ~(1 << SCS);
@@ -523,6 +551,23 @@ void main() {
 			// Transmit F-RAM data over USART
 			cnc_capture_readback();
 					
+			}else{
+			// Low speed capture, relay on delay_ms and delay_us.
+				if(useMicro){// Higher speed capture 10-50KHz
+					for(uint16_t i = 0; i < readCount;i++){
+						__asm__("mov 0x5204, 0x5006"); // use mov to copy data directly mem2mem from PB_IDR to SPI1_DR
+						delay_us(delayTime);	
+					}
+					
+				}else{// Lower speed capture 10Hz-5KHz
+					for(uint16_t i = 0; i < readCount; i++){
+						__asm__("mov 0x5204, 0x5006"); // use mov to copy data directly mem2mem from PB_IDR to SPI1_DR
+						delay_ms(delayTime);
+					}
+				}
+				
+				// Transmit F-RAM data over USART 
+				cnc_lowcapture_readback();
 			}
 			//prntf("arm done!\n");
 
@@ -559,8 +604,16 @@ void main() {
 			//prntf("Set Div\n");
 			break;
 
-		case SUMP_SET_READ_DELAY_COUNT:
+		case SUMP_SET_READ_DELAY_COUNT:// setting up sample size, Only apply for capture < 100KHz 
 			cnc_getcmd();
+			
+			readCount = 4 * (((CapParam[2] << 8) | CapParam[1]) + 1);
+				if (readCount > ramADDR)
+				readCount = ramADDR;
+			delayCount = 4 * (((CapParam[4] << 8) | CapParam[3]) + 1);
+				if (delayCount > ramADDR)
+				delayCount = ramADDR;
+			
 			//prntf("Read delay\n");
 			break;
 
