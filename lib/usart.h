@@ -13,7 +13,7 @@
  * PC2 -> RX
  * But can be changed using syscfg 
  */
-void usart_init(uint16_t BAUDRATE);
+void usart_init(uint32_t BAUDRATE);
 
 void usart_write(uint8_t data);
 
