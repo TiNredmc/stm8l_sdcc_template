@@ -9,4 +9,5 @@
 *.rel
 *.rst
 *.sym
-
+*.ihx
+*.bin
