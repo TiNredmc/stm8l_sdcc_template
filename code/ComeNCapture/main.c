@@ -469,8 +469,7 @@ void main() {
 	TIM2init();// Start Timer2 
 	FM25_unlock();// Unlock write protection of FM25V01A
 	__asm__("rim");// start system interrupt
-	delay_ms(1000);// wait for everything stable
-
+	delay_ms(500);// wait for everything stable
 
 	while (1) {
 		if(USART1_SR & (1 << USART1_SR_RXNE)){// check if receive data is ready to be read.
