@@ -5,7 +5,7 @@ void usart_init(uint16_t BAUDRATE) {
 /*Set clock divider to 1, because the SDCC always set to 8 */
 CLK_CKDIVR = 0x00;
 /*Enable clock for USART1*/
-CLK_PCKENR1 |= 0x10; // enable USART1 clock.
+CLK_PCKENR1 |= 0x20; // enable USART1 clock.
 /* reset the baudrate setting */ 	
 	USART1_BRR2 = 0X0F; 
 	USART1_BRR2 = 0xF0;
