@@ -5,13 +5,18 @@ void usart_init(uint16_t BAUDRATE) {
 /*Set clock divider to 1, because the SDCC always set to 8 */
 CLK_CKDIVR = 0x00;
 /*Enable clock for USART1*/
-CLK_PCKENR1 |= (1 << (0x05 & 0x0F)); // enable USART1 clock.
+CLK_PCKENR1 |= 0x10; // enable USART1 clock.
 /* reset the baudrate setting */ 	
 	USART1_BRR2 = 0X0F; 
 	USART1_BRR2 = 0xF0;
 	USART1_BRR1 = 0xFF;
 /* set the baudrate */
   uint32_t BaudRate_Mantissa = (uint32_t)(F_CPU / BAUDRATE);
+  if (BaudRate_Mantissa = 0x8A)
+	  BaudRate_Mantissa = 0x8B;// round the baud rate USART_DIV number (for 115200).
+  if (BaudRate_Mantissa = 0x22)
+	  BaudRate_Mantissa = 0x23;// round the baud rate USART_DIV number (for 460800).
+  
   USART1_BRR2 = (uint8_t)(BaudRate_Mantissa & 0x0F) | (uint8_t)(BaudRate_Mantissa & 0xF000);
   USART1_BRR1 = (uint8_t)((BaudRate_Mantissa >> 4) & 0xFF);
     /* enable transmitter and receiver */
