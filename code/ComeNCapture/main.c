@@ -186,6 +186,7 @@ void spi_irq(void) __interrupt(26){}
 
 // receive extra bytes from host after first byte command
 void cnc_getcmd(){
+	while (!(USART1_SR & (1 << USART1_SR_RXNE)));
 	CapParam[1] = USART1_DR;
 	while (!(USART1_SR & (1 << USART1_SR_RXNE)));
 	CapParam[2] = USART1_DR;
@@ -193,19 +194,25 @@ void cnc_getcmd(){
 	CapParam[3] = USART1_DR;
 	while (!(USART1_SR & (1 << USART1_SR_RXNE)));
 	CapParam[4] = USART1_DR;
-	while (!(USART1_SR & (1 << USART1_SR_RXNE)));
 }
 
 // transmit extrabyte to host, for debugging purpose only.
 void cnc_prntcmd(){
-	USART1_DR = divider >> 24;
+	USART1_DR = CapParam[0];
 	while (!(USART1_SR & (1 << USART1_SR_TC)));
-	USART1_DR = divider >> 16;
+	USART1_DR = CapParam[1];
 	while (!(USART1_SR & (1 << USART1_SR_TC)));
-	USART1_DR = divider >> 8;
+	USART1_DR = CapParam[2];
 	while (!(USART1_SR & (1 << USART1_SR_TC)));
-	USART1_DR = divider;
+	USART1_DR = CapParam[3];
 	while (!(USART1_SR & (1 << USART1_SR_TC)));
+	USART1_DR = CapParam[4];
+	while (!(USART1_SR & (1 << USART1_SR_TC)));
+}
+
+void cnc_cmdcleanup(){
+	for(uint8_t i=0;i < 5;i++)
+		CapParam[i] = 0;
 }
 // Report Metadata to SUMP OLS
 void cnc_mtdtReport(){
@@ -473,7 +480,7 @@ void main() {
 
 	while (1) {
 		if(USART1_SR & (1 << USART1_SR_RXNE)){// check if receive data is ready to be read.
-		CapParam[0] = USART1_DR;
+		CapParam[0] = usart_read();
 		switch (CapParam[0]){
 
 		case SUMP_QUERY: 
@@ -592,12 +599,12 @@ void main() {
 
 		case SUMP_SET_DIVIDER:
 			cnc_getcmd();
-
-			divider = CapParam[4];
-			divider = divider << 8;
-			divider += CapParam[3];
+	
+			divider = CapParam[3];
 			divider = divider << 8;
 			divider += CapParam[2];
+			divider = divider << 8;
+			divider += CapParam[1];
 
 			cnc_capture_timing_setup();
 			//prntf("Set Div\n");
@@ -605,7 +612,7 @@ void main() {
 
 		case SUMP_SET_READ_DELAY_COUNT:// setting up sample size, Only apply for capture < 100KHz 
 			cnc_getcmd();
-			
+
 			readCount = 4 * (((CapParam[2] << 8) | CapParam[1]) + 1);
 				if (readCount > ramADDR)
 				readCount = ramADDR;
@@ -628,6 +635,7 @@ void main() {
 		default:
 			break;
 		}// switch cases	
+		cnc_cmdcleanup();
 		}// if(usart available)
 	
 	}// while loop 
