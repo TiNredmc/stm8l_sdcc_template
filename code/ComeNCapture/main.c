@@ -78,7 +78,7 @@ const static uint8_t FM25_READ		= 0x03;// Read memory data
 const static uint8_t FM25_WRITE		= 0x02;// Write memory data 
 
 // capture loop locking status
-static bool capture = true;
+static uint8_t capture = 1;
 
 // F-RAM address counter keeper for reading and slow write 
 uint16_t ramADDR = 0x3FFF;// maximum F-RAM address for roll-counting 
@@ -167,7 +167,7 @@ void TIM2_capture(uint8_t pscr){
  
 /* Interrupt handler for TIM2 */
 void TIM2isr(void) __interrupt(19){// the interrupt vector is 19 (from the STM8L151F36U datasheet page 49)
-	capture = false;
+	capture = 0;
 	//USART1_DR = 0x69;
 	//while (!(USART1_SR & (1 << USART1_SR_TC)));
 	// clear TIM2's update interrupt flag
@@ -288,6 +288,7 @@ void cnc_capture_start(uint8_t samspd){
 		TIM2_CR1 = 0x01;
 		do{		
 		__asm__("mov 0x5204, 0x5006");// load directly from mem2mem, 1 cpu cycle
+		__asm__("nop\n nop\n");
 		}while(capture);
 		// stop counter. It's auto-reset.
 		TIM2_CR1 = 0x00;
@@ -403,7 +404,7 @@ void cnc_capture_start(uint8_t samspd){
 		break;
 	}
 	
-	capture = true;// reset the loop value to true for next capture
+	capture = 1;// reset the loop value to true for next capture
 
 	PD_ODR |= (1 << SCS);
 }
