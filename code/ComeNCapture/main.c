@@ -113,7 +113,6 @@ void prntf(char *p){
 	__asm__("sim");
 	while(*p){
 		usart_write(*p++);
-		__asm__("nop\n nop\n nop");
 	}
 	__asm__("rim");
 }
@@ -122,7 +121,7 @@ void prntf(char *p){
 ///////// Timer stuffs //////////////////////////////////////////////////
 /* Initialize the TIM2 for timing source for the Logic capture */
 void TIM2init(){
-	CLK_PCKENR1 |= 0x01;// enable TIM2 clokc
+	CLK_PCKENR1 |= 0x01;// enable TIM2 clock
 	
 	// auto reload when counter reach 0x3FFF
 	// this will trigger interrupt to change state that while loop checks
