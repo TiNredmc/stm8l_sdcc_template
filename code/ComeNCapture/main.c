@@ -19,7 +19,7 @@
 #include <spi.h>
 
 // Define FM25V01A's CS pin
-#define SCS	0 // PD4 as a CS pin
+#define SCS	4 // PC4 as a CS pin
 
 // Define SUMP command for capturing 
 // From https://github.com/gillham/logic_analyzer
@@ -97,11 +97,11 @@ void IOinit(){
 	PB_CR1 = 0; // floating input
 	PB_CR2 = 0; // No interrupt
 
-	// Setup PD0 as CS pin for SPI 
-	PD_DDR |= (1 << SCS);
-	PD_CR1 |= (1 << SCS);
+	// Setup PC4 as CS pin for SPI 
+	PC_DDR |= (1 << SCS);
+	PC_CR1 |= (1 << SCS);
 
-	PD_ODR |= (1 << SCS);
+	PC_ODR |= (1 << SCS);
 
 	//then re initialize SPI-needed pins
 	SPI_Init(FSYS_DIV_2);// Init SPI peripheral with 8MHz clock (Max speed tho).
@@ -268,7 +268,7 @@ void cnc_capture_start(uint8_t samspd){
 	wrtBF[2] = 0;
 
 	//prntf("capture started!\n");
-	PD_ODR &= (0 << SCS);
+	PC_ODR &= (0 << SCS);
 
 	SPI_Write(wrtBF, 3);// start writing F-RAM at offset = 0 
 
@@ -406,7 +406,7 @@ void cnc_capture_start(uint8_t samspd){
 	
 	capture = 1;// reset the loop value to true for next capture
 
-	PD_ODR |= (1 << SCS);
+	PC_ODR |= (1 << SCS);
 }
 
 // Read data back from F-RAM and Dump to USART byte per byte
@@ -417,7 +417,7 @@ void cnc_capture_readback(){
 	wrtBF[2] = 0;
 
 	
-	PD_ODR &= (0 << SCS);
+	PC_ODR &= (0 << SCS);
 
 	SPI_Write(wrtBF, 3);
 	//prntf("ready to send\n");
@@ -427,7 +427,7 @@ void cnc_capture_readback(){
 	while (!(USART1_SR & (1 << USART1_SR_TC)));
 	}while(ramADDR--);
 
-	PD_ODR |= (1 << SCS);
+	PC_ODR |= (1 << SCS);
 	ramADDR = 0x3FFF;
 
 }
@@ -443,7 +443,7 @@ void cnc_lowcapture_readback(){
 	wrtBF[2] = 0;
 
 	
-	PD_ODR &= (0 << SCS);
+	PC_ODR &= (0 << SCS);
 
 	SPI_Write(wrtBF, 3);
 	//prntf("ready to send\n");
@@ -453,14 +453,14 @@ void cnc_lowcapture_readback(){
 	while (!(USART1_SR & (1 << USART1_SR_TC)));
 	}while(readCount--);
 
-	PD_ODR |= (1 << SCS);
+	PC_ODR |= (1 << SCS);
 }
 
 //FM25V01A : enable writing
 void FM25_unlock(){
-	PD_ODR &= ~(1 << SCS);
+	PC_ODR &= ~(1 << SCS);
 	SPI_Write(&FM25_WREN, 1);
-	PD_ODR |= (1 << SCS);
+	PC_ODR |= (1 << SCS);
 }
 
 void main() {
