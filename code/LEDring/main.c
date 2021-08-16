@@ -79,9 +79,9 @@ void displayBar(uint8_t ds)// Dislay Progress bar
 // Turn red dot on or off.
 void displayRedDot(bool rd){
 	if(rd)
-		dataSet[3] |= (1 << 4);// LED red dot is controlled by bit 3 on dataSet[3].
+		dataSet[3] |= (1 << 3);// LED red dot is controlled by bit 3 on dataSet[3].
 	else
-		dataSet[3] &= ~(1 << 4);
+		dataSet[3] &= ~(1 << 3);
 }
 
 // Cool transition animation from number a to b (returning to 0)
