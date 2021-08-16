@@ -25,6 +25,13 @@ CLK_PCKENR1 |= 0x20; // enable USART1 clock.
     USART1_CR2 = 0x04 | 0x08;// add 1 to bit number 2 and 3 for enabling the Tx and Rx
 }
 
+void usart_IrDA_init(){
+	// Set divider to 1
+	USART1_PSCR = 0x01;
+	// Enable IrDA mode in normal power mode
+	USART1_CR5 |= 0x02;
+}
+
 void usart_write(uint8_t data) {
     USART1_DR = data;
     while (!(USART1_SR & (1 << USART1_SR_TC)));
