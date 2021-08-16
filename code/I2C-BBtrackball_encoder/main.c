@@ -197,7 +197,9 @@ void main(){
 	
 	GPIOinit(); // init all needed GPIOs
 	I2CInit();// init i2c as slave having address 0x65
+	PB_ODR |= 0x0F;
 	delay_ms(1000);
+	PB_ODR &= ~0x0F;
 	__asm__("rim");// enble interrupt
 	
 	while(1){
