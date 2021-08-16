@@ -93,17 +93,18 @@ uint16_t delayCount = 0;
  * Initialize PC4 as SCS pin also Init SPI stuffs too
  */
 void IOinit(){
-	PB_DDR = 0; // set all pin at input
-	PB_CR1 = 0; // floating input
-	PB_CR2 = 0; // No interrupt
+	PB_DDR &= ~((1 << 0) | (1 << 1) | (1 << 2) | (1 << 3) | (1 << 4)); // set all channel pins at input
+	PB_CR1 &= ~((1 << 0) | (1 << 1) | (1 << 2) | (1 << 3) | (1 << 4)); // floating input
+	PB_CR2 &= ~((1 << 0) | (1 << 1) | (1 << 2) | (1 << 3) | (1 << 4)); // No interrupt
 
 	// Setup PC4 as CS pin for SPI 
 	PC_DDR |= (1 << SCS);
 	PC_CR1 |= (1 << SCS);
 
+	// quicky force CS HIGH
 	PC_ODR |= (1 << SCS);
 
-	//then re initialize SPI-needed pins
+	//Init SPI
 	SPI_Init(FSYS_DIV_2);// Init SPI peripheral with 8MHz clock (Max speed tho).
 }
 
