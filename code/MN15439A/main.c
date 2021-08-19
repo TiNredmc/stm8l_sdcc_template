@@ -2,6 +2,7 @@
  * Coded by TinLethax 2020/05/03 +7
  */
 #include <stdint.h>
+#include <string.h>
 #include <stm8l.h>
 #include <delay.h>
 
@@ -16,9 +17,10 @@
 #define CLK 5	// Clock line on PB5
 #define Mo  6	// Master out on PB6
 
-// Dummy bytes ; Format (MSB)[a,b,c,d,e,f,0,0](LSB) 
-// Memcpy to modify this array is viable.
-static char img1[39]={
+//Dummy bytes ; Format (MSB)[a,b,c,d,e,f,0,0](LSB) 
+
+
+const static char img1[39]={
 0x54, 0xA8, 0x54, 0xA8,
 0x54, 0xA8, 0x54, 0xA8,
 0x54, 0xA8, 0x54, 0xA8,
@@ -43,20 +45,20 @@ void initGPIOs(){
 	__asm__("bset 0x5005, #5"); // _/ clock need to be high if no data is being sent 
 }
 
-//Very Long 286 bit bitbanging 
+// Very Long 288 bits bitbanging into 288 bits Shift register.
 
-/* first 234 bit is divided into 39 part, each part contain 6 bit of dot data 
+/* first 234 bits is divided into 39 part, each part contain 6 bit of dot data 
  * [1:1a,1f,1b,1e,1c,1d] [2:2a,2f,2b,2e,2c,2d] ..... [39:39a,39f,39b,39e,39c,39d] ; [Row Number:Column a, f, b, e, c, d]
- * The rest 52 bit (238 to 286) is the grid control bits 
- * [G1:235] [G2:236] ..... [G52:286] ; [Grid number : bit position]
+ * The rest 54 bits (238 to 286) is the grid control bits 
+ * [G1:235] [G2:236] ..... [G54:288] ; [Grid number : bit position] It seems like only grid 1 to 52 is usable 
  */
 
 /* uint8_t Grid is the current Grid number for displaying certain region of the display, The active grid will be in the form N and N+1 by N is between 1 and 53
- * char *rowdata[] is the array that pointed to the actuall memory parts contain the Display bitmap
+ * char *rowdata is the pointer that pointed to the array containing the Display bitmap.
  */    
 uint8_t EvOd = 0;
 uint8_t logic = 0;
-void LBB(uint8_t Grid){
+void LBB(uint8_t Grid,char *rowdata){
 // Logically thinking : Determine the Grid is Event or Odd number (Important, For the simple algoithm to convert abcdef to afbecd format).
 	if(Grid%2){
 	EvOd = 1;// event number (event grid), Only manipulate the d, e, f Dots
@@ -77,7 +79,8 @@ void LBB(uint8_t Grid){
 	for (uint8_t a=0;a< 6;a++){
 	__asm__("bres 0x5005, #5"); // \_
 
-	logic = img1[i];// copy and move to the next data in the array
+	memcpy(&logic, rowdata + i, 1);
+	//logic = img1[i];// copy and move to the next data in the array
 	logic = logic & (uint8_t)(1 << reOrder[EvOd][a]);
 	
 	if(logic) //sending the data
@@ -91,32 +94,8 @@ void LBB(uint8_t Grid){
 
 	}// for (int i=0;i< 39;i++)
 
-/*
-// Grid Activation phase 1a : Check if We use the Grid 52, If yes, Grid 1 must be activated
-	if (Grid == 52){
 
-// in case that Grid is reaching the end (Grid 52) the First Grid (1) must be activated 
-	__asm__("bres 0x5005, #5"); // \_
-	__asm__("bset 0x5005, #6"); // Grid 1 must be activated 	
-	__asm__("bset 0x5005, #5"); // _/
-
-// Grid Activation phase 2a : Disable the rest unused Grid
-	for (uint8_t i=0;i<50;i++){
-	__asm__("bres 0x5005, #5"); // \_
-	__asm__("bres 0x5005, #6"); // The Unused Grid will be turn off
-	__asm__("bset 0x5005, #5"); // _/
-
-	}// for (int i=0;i<50;i++)
-
-// Grid Activation phase 3a : Enable the last Grid
-	__asm__("bres 0x5005, #5"); // \_
-	__asm__("bset 0x5005, #6"); // activate Grid 52 	
-	__asm__("bset 0x5005, #5"); // _/
-
-
-	}else{// if grid is not 52 ; to these stuffs */
-
-// Grid Activation phase 1b : Disable unused grid
+// Grid Activation phase 1 : Disable unused grid before Grid N
 	for (uint8_t i=1;i<Grid;i++){
 	__asm__("bres 0x5005, #5"); // \_
 	__asm__("bres 0x5005, #6"); // The Unused Grid will be turn off
@@ -124,32 +103,32 @@ void LBB(uint8_t Grid){
 
 	}
 
-// Grid Activation phase 2b : Only turn the Grid N and N+1 on by send 1 two times
+// Grid Activation phase 2 : Only turn the Grid N and N+1 on by send 1 two times
 	for (uint8_t i=0; i < 2; i++){
 	__asm__("bres 0x5005, #5"); // \_
 	__asm__("bset 0x5005, #6"); // two pair will be activated	
 	__asm__("bset 0x5005, #5"); // _/
 
 	}
-
-// Grid Activation phase 3b : Disable the rest unused Grid
+	__asm__("bres 0x5005, #6"); // The Unused Grid will be turn off
+// Grid Activation phase 3 : Disable the rest unused Grid after Grid N+1
 	for (int i=Grid;i<53;i++){
 	__asm__("bres 0x5005, #5"); // \_
-	__asm__("bres 0x5005, #6"); // The Unused Grid will be turn off
+
 	__asm__("bset 0x5005, #5"); // _/
 
 	}
-
-	//}// if (Grid == 52)
-	__asm__("bres 0x5005, #6"); // bring data line low after trasmission
 }
+
+// TODO : implement PWM to provide GPC pin with W3iRd frequency shifting.
+
 void main() {
 	CLK_CKDIVR = 0x00; // Keep the clock at 16MHz with no clock divider
 	initGPIOs(); // Init all pin that we want at Super fast 10MHz
  	while (1) {
 	// Still working on it dude.
 	for (uint8_t i=1;i < 53;i++){
-	LBB(i);
+	LBB(i,img1);
 	}
     	}
 }
