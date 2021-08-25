@@ -5,6 +5,7 @@
 #include <string.h>
 #include <stm8l.h>
 #include <delay.h>
+//#include "BMP.h"
 
 /* Define your pinout (MUST BE FAST MODE COMPATIBLE !!) 
  * If Changed, You must change the bset and bres inline assembly pin 
@@ -18,8 +19,6 @@
 #define Mo  6	// Master out on PB6
 
 //Dummy bytes ; Format (MSB)[a,b,c,d,e,f,0,0](LSB) 
-
-
 const static char img1[39]={
 0x54, 0xA8, 0x54, 0xA8,
 0x54, 0xA8, 0x54, 0xA8,
@@ -32,10 +31,16 @@ const static char img1[39]={
 0x54, 0xA8, 0x54, 0xA8,
 0x54, 0xA8, 0x54      };
 
+
 const static uint8_t reOrder[2][6]={
 {0,2,0,3,0,4}, /* the bit shift to convert def to the afbecd format */
 {7,0,6,0,5,0} /* the bit shift to convert abc to the afbecd format */
 }; 
+
+void LBB(uint8_t Grid,char *rowdata);
+static uint8_t EvOd = 0;
+static uint8_t logic = 0;
+static uint8_t GridNum = 1;
 
 // GPIOs initialization, Super Fast 10MHz instead 2MHz
 void initGPIOs(){
@@ -43,6 +48,32 @@ void initGPIOs(){
 	PB_CR1 |= (1 << BLK) | (1 << LAT) | (1 << CLK) | (1 << Mo); // by using Push-pull mode
 	PB_CR2 |= (1 << BLK) | (1 << LAT) | (1 << CLK) | (1 << Mo); // That Super fast at 10MHz max speed
 	__asm__("bset 0x5005, #5"); // _/ clock need to be high if no data is being sent 
+}
+
+// TIM4 for display refreshing
+void TIM4fps_init(){
+	CLK_PCKENR1 |= 0x04;// enable the TIM4 clock
+	/* TIM4_TimeBaseInit(pscrVal, arrVal)*/
+	TIM4_ARR = 40-1; //set prescaler period
+	TIM4_PSCR = 0x06;// set prescaler 
+	TIM4_EGR = 0x01;// event source update 
+	/*TIM4_cmd(ENABLE)*/
+	TIM4_CR1 |= 0x01 ;
+	/*TIM4_ClearFlag()*/
+	TIM4_SR = (uint8_t)~0x01;
+	/*TIM4_ITConfig(TIM4_IT_Update, ENABLE)*/	
+	TIM4_IER |= 0x01;// make sure that I enable interrupt for the TIM4
+	/*TIM4_cmd(ENABLE)*/
+	TIM4_CR1 |= 0x01 ;
+}
+
+/* Interrupt handler for TIM4 */
+void TIM4isr(void) __interrupt(25){// the interrupt vector is 25 (from the STM8L151F36U datasheet page 49)
+	LBB(GridNum++, img1);
+	if(GridNum == 53)
+		GridNum = 1;
+	/*TIM4_ITClearPendingBit()*/
+	TIM4_SR = (uint8_t)~0x01;
 }
 
 // Very Long 288 bits bitbanging into 288 bits Shift register.
@@ -56,8 +87,7 @@ void initGPIOs(){
 /* uint8_t Grid is the current Grid number for displaying certain region of the display, The active grid will be in the form N and N+1 by N is between 1 and 53
  * char *rowdata is the pointer that pointed to the array containing the Display bitmap.
  */    
-uint8_t EvOd = 0;
-uint8_t logic = 0;
+
 void LBB(uint8_t Grid,char *rowdata){
 // Logically thinking : Determine the Grid is Event or Odd number (Important, For the simple algoithm to convert abcdef to afbecd format).
 	if(Grid%2){
@@ -125,10 +155,10 @@ void LBB(uint8_t Grid,char *rowdata){
 void main() {
 	CLK_CKDIVR = 0x00; // Keep the clock at 16MHz with no clock divider
 	initGPIOs(); // Init all pin that we want at Super fast 10MHz
+	TIM4fps_init();
+	__asm__("rim");// trun system interrupt controller on
  	while (1) {
 	// Still working on it dude.
-	for (uint8_t i=1;i < 53;i++){
-	LBB(i,img1);
-	}
+			
     	}
 }
