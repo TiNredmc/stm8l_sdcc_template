@@ -4,25 +4,31 @@
 #include <stm8l.h>
 #include <i2c.h>  
 
-
-void i2c_init(uint8_t devID, uint16_t SCLSpeed) { // init I2C with Device address 
+void i2c_init(uint8_t devID, uint8_t SCLSpeed) { // init I2C with Own Device address (Master address) and I2C Speed 
     CLK_CKDIVR = 0x00; // No clock divider
-    CLK_PCKENR1 |= (uint8_t)(1 << 0x03);// enable the I2C clock 
+    CLK_PCKENR1 |= 0x04;// enable the I2C clock 
     I2C1_FREQR |= F_CPU/1000000 ;// 16MHz/10^6
 	
     I2C1_CR1 &= ~0x01;// cmd disable for i2c configurating
 
-    I2C1_TRISER |= (uint8_t)(0);// 0 in decimal, Very Short Riser Time (suitable for MLX90614, That why i came up with this library)
+	if (SCLSpeed == I2C_400K){// 400KHz
+    I2C1_TRISER |= 5;// Max 300ns rise time.
 
-    I2C1_CCRL = (uint8_t)SCLSpeed;// the clock speed lower bits
-    I2C1_CCRH = (uint8_t)((SCLSpeed >> 8) & 0x0F);// the clock speed higher bits
+    I2C1_CCRL = 0x0D;// the clock speed lower bits
+    I2C1_CCRH = 0x80;// the clock speed higher bits + enable High speed mode (400KHz)
+	}else{// 100KHz 
+    I2C1_TRISER |= 16 + 1 ;// I2C1_FREQR + 1 max 1000ns rise time.
 
-    I2C1_CR1 |= (0x00 | 0x01);// i2c mode not SMBus
+    I2C1_CCRL = 0x50;// the clock speed lower bits
+    I2C1_CCRH = 0x00;// the clock speed higher bits
+	}
+
+    I2C1_CR1 |= 0x01;// i2c mode not SMBus
 	
-    I2C1_OARL = (uint8_t)(devID);// deviceID 
-    I2C1_OARH = (uint8_t)((uint8_t)(0x00 | 0x40 ) | (uint8_t)((uint16_t)( (uint16_t)devID &  (uint16_t)0x0300) >> 7)); 
+    I2C1_OARL = devID;// own address of Master 
+    I2C1_OARH = 0x00; 
 	
-    I2C1_CR1 |= (1 << 0);// cmd enable
+    I2C1_CR1 |= 0x01;// cmd enable
 }
 
 uint8_t i2c_ChkEv(uint16_t I2C_Event)// event check, VERY CRUCIAL part, otherwise I2C won't work properly 
@@ -50,17 +56,38 @@ void i2c_write(uint8_t data) {// Write data
     I2C1_DR = data;
     while (!i2c_ChkEv(0x0780));// EV8
 }
+
+void i2c_writePtr(uint8_t *data, uint16_t len){// Write single or sequencial byte with pre defined size.
+	while(len--){
+		I2C1_DR = *data++;
+	while (!i2c_ChkEv(0x0780));// EV8	
+	}
+}
+
+void i2c_writePtrAuto(uint8_t *data){// Write single or sequencial byte with auto increment
+	while(*data){
+		I2C1_DR = *data++;
+	while (!i2c_ChkEv(0x0780));// EV8	
+	}
+}
 uint8_t i2c_read(){// Read data
     while (!i2c_ChkEv(0x0340));// EV7
     return (uint8_t)I2C1_DR;
 }
 
+void i2c_readPtr(uint8_t *data, uint16_t len){
+	while(len--){
+		while (!i2c_ChkEv(0x0340));// EV7
+		*data ++ = I2C1_DR;
+	}
+}
+
 void i2c_write_addr(uint8_t addr) {//request for Write with 7bit address (you need to put 8 bit address, like 0x5A (MLX90614))
- I2C1_DR = (uint8_t)((addr << 1) & 0xFE);
+ I2C1_DR = (addr << 1) & 0xFE;
  while (!i2c_ChkEv(0x0782));// EV6
 }
 
 void i2c_read_addr(uint8_t addr) {//request for Read with 7bit address (you need to put 8 bit address, like 0x5A (MLX90614))
- I2C1_DR = (uint8_t)((addr << 1)| 0x01);
+ I2C1_DR = (addr << 1)| 0x01;
  while (!i2c_ChkEv(0x0302));// EV6
 }
