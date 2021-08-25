@@ -19,7 +19,7 @@ void SPI_Init(uint8_t spi_speed) {
 
 	SPI1_CR1 |= (1 << SPI1_CR1_MSTR) | (spi_speed << 3);
 	SPI1_CR2 |= (1 << SPI1_CR2_SSM) | (1 << SPI1_CR2_SSI);
-	SPI1_CR2 &= ~(1 << SPI1_CR2_BDM);
+	//SPI1_CR2 &= ~(1 << SPI1_CR2_BDM);
 	SPI1_CR1 |= (1 << 6);// Enable SPI1 
 }
 
