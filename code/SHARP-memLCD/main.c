@@ -124,7 +124,7 @@ void LCD_periphSetup(){// Peripheral Setup. PWM and SPI
 
 void LCD_unlock(){// We will leave the Flash unlocked, so we don't need two times reset to re-write the framebuffer to flash again
 	uint8_t *fb;
-	fb = (uint8_t *)BUFOFF;
+	fb = (uint16_t *)BUFOFF;
 	// Flash unlock (Program region not EEPROM (data) region)
 	FLASH_PUKR = FLASH_PUKR_KEY1;// 0x56
 	FLASH_PUKR = FLASH_PUKR_KEY2;// 0xAE
@@ -138,7 +138,7 @@ void LCD_unlock(){// We will leave the Flash unlocked, so we don't need two time
 
 void LCD_flashWrite(uint8_t *Src, uint16_t offset, size_t len){// It's memcpy-likes but Flash friendly
 	uint8_t *fb;
-	fb = (uint8_t *)BUFOFF + offset;
+	fb = (uint16_t *)BUFOFF + offset;
 
 	while(len--){
 		*fb++ = *Src++;
@@ -181,7 +181,7 @@ void LCD_lineUpdate(uint8_t line){// Single Row display update
 void LCD_rangeUpdate(uint8_t Start, uint8_t End){// Multiple Row update from Start to End 
 	uint16_t offset = 0;
 	uint8_t *fb;
-	fb = (uint8_t *)BUFOFF;
+	fb = (uint16_t *)BUFOFF;
 	SendBuf[0] = 0x01;// Display update Command
 	SendBuf[1] = Start;
 
