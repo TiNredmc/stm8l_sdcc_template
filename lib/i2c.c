@@ -31,6 +31,10 @@ void i2c_init(uint8_t devID, uint8_t SCLSpeed) { // init I2C with Own Device add
     I2C1_CR1 |= 0x01;// cmd enable
 }
 
+void i2c_enableIt(){// Enable Interrupt
+	I2C1_ITR |= (1 << 0) | (1 << 1) | (1 << 2);// enable interrupt (buffer, event an error interrupt)
+}
+
 uint8_t i2c_ChkEv(uint16_t I2C_Event)// event check, VERY CRUCIAL part, otherwise I2C won't work properly 
 {
   volatile uint16_t lastevent = 0x00;

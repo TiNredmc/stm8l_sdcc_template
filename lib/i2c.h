@@ -12,6 +12,7 @@
 #define I2C_400K	40
 
 void i2c_init(uint8_t devID, uint8_t SCLSpeed);
+void i2c_enableIt();
 uint8_t i2c_ChkEv(uint16_t I2C_Event); 
 void i2c_start();
 void i2c_stop();
