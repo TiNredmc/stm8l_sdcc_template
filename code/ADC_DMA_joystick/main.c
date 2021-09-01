@@ -1,5 +1,5 @@
-/* Simple LED blinking on PB4 
- * Coded by TinLethax
+/* ADC with DMA example.
+ * Coded by TinLethax 2021/08/? +7
  */
 #include <stdint.h>
 #include <string.h>
