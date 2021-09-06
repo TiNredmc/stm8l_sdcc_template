@@ -18,10 +18,9 @@
 #define EPW_VBOOST		5// PC5
 
 // Definitions of EPW14040AA1
-#define EPW_FB_SIZE 	1024 	// define the memory size used for Frame Buffer (128x2 bytes).
-#define EPW_FB_ADDR 	0x9BFF	// define the Frame buffer Flash memory address. Staying away from Code on Flash.
+#define EPW_FB_SIZE 	256 	// define the memory size used for Frame Buffer (128x2 bytes = 256 bytes).
 
-#define EPW_FB_HALFSIZE 512 // define the memory size used for the Send buffer.
+#define EPW_FB_HALFSIZE 128 // define the memory size used for the Send buffer.
 
 #define EPW_ADDR 		0x78 // 7bit address already.
 
@@ -73,11 +72,10 @@
 // allocate mem for screen buffer 
 
 // 16 column bytes and 16 rows 
-__at(EPW_FB_ADDR) uint8_t FB0[EPW_FB_SIZE];// standard horizontal byte format Frame buffer
+uint8_t FB0[EPW_FB_SIZE]={0};// standard horizontal byte format Frame buffer
 
 // 16 column bytes and 8 rows (For updating each Memory Page (0:1)).
-static uint8_t PG[EPW_FB_HALFSIZE];// single page vertical byte format for data sending plus 1 command at the first byte
-
+static uint8_t PG[EPW_FB_HALFSIZE];// single page vertical byte format for data sending.
 
 //These Vars required for print function
 static uint8_t YLine = 1;
@@ -87,26 +85,18 @@ static uint8_t Xcol = 1;
 // GPIO init 
 void GPIO_init(){
 	
-	// Init PC port for RSTB and Vboost .
+	// Init Port C for RSTB and Vboost .
 	PC_DDR |= (1 << EPW_RSTB) | (1 << EPW_VBOOST);// Set PC4,5 as output
 	PC_CR1 |= (1 << EPW_RSTB) | (1 << EPW_VBOOST);// with push pull mode.
 }
 
-// Allocate Flash memory, use it instead of ram (for Frame Buffer).
-// This function is actually enable Flash read/write to make it acts like a SLOW ram.
-void EPW_malloc(){
-		// Flash unlock (Program region not EEPROM (data) region)
-	FLASH_PUKR = FLASH_PUKR_KEY1;// 0x56
-	FLASH_PUKR = FLASH_PUKR_KEY2;// 0xAE
-	while(!(FLASH_IAPSR & (1 << FLASH_IAPSR_PUL)));// wait until Flash in unlocked
-}
 
 // I2C send single CMD byte 
 void EPW_sendCMD(uint8_t packet){
 	i2c_start();// generate start condition.
 	
 	i2c_write_addr(EPW_ADDR);// call slave device for write.
-		i2c_write(EPW_CMD_MODE);
+		i2c_write(EPW_CMD_MODE);// Indicator that next byte is command
 		i2c_write(packet);// write data to EPW14040AA1.
 	
 	i2c_stop();// generate stop condition.
@@ -150,15 +140,17 @@ void EPW_DispOn(bool on){
 // Update Display  
 void EPW_Update(){
 	
-for (uint8_t i=0; i < 2; i++){
+for (uint8_t p=0; p < 2; p++){// Do this twice for 2 mem pages.
 	// Byte Flip 90 degree
-	for (uint8_t FBOff = 0; FBOff < 128; FBOff ++){// 128 cycles
-		for (uint8_t j=0; i < 8; j++){// Single bit of FB0 every 128n is rotated to vertical byte 
-			PG[FBOff+1] |= ( ( FB0[(128*j) /*Row select*/ +(FBOff/8) /*Horizontal offset, change byte every 8 column*/ + (i ? 512 : 0) /* Page changing */ ] && (1 << (FBOff%8)) ) << j);
+	for (uint8_t FBOff = 0; FBOff < 16; FBOff ++){// 16 bytes column of FB0.
+		for (uint8_t i=0; i < 8; i++){// read each bit of every byte from FB0.
+			for (uint8_t j=0; j < 8; j++){// Single bit of FB0 every 16n byte is rotated to vertical byte 
+				PG[FBOff+1] |= ( ( FB0[(16*j) /*Row select*/ +(FBOff/8) /*Horizontal offset, move to next FB0 byte every 8 column*/ + (p ? EPW_FB_HALFSIZE : 0) /* Page changing */ ] && (1 << (i%8)) ) << j);
+			}
 		}
 	}
 				// select Memory page before updating.
-	EPW_sendCMD(i ? EPW_PGSEL_1 : EPW_PGSEL_0);// Select whether to send to Page number 0 or 1.
+	EPW_sendCMD(p ? EPW_PGSEL_1 : EPW_PGSEL_0);// Select whether to send to Page number 0 or 1.
 	
 	i2c_start();// generate start condition.
 	
@@ -241,8 +233,6 @@ void main(){
 	GPIO_init();// GPIO Init
 	i2c_init(0x00, I2C_400K);// I2C at 400KHz
 	
-	// Allocate Flash memory for Frame Buffer.
-	EPW_malloc();
 	// Clean Frame Buffer for Fresh init.
 	EPW_Clear();
 	
