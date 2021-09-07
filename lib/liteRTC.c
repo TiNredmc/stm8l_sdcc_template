@@ -1,21 +1,13 @@
+/* liteRTC, Using Real time clock of STM8L151F3 easily
+ * Coded By TinLethax way back in May. Converted to library at 2021/09/07 +7
+ */
+ 
 #include <stdint.h>
 #include <stdio.h>
 #include <stm8l.h>
 #include <string.h>
-#include <delay.h>
-#include <usart.h>
 
-uint16_t REMAP_Pin = 0x011C; 
-uint8_t Hour, Min, Sec;
-
-int putchar(int c){
-	usart_write(c);
-	return 0;
-}
-
-int get_char() {
-	return usart_read();
-}
+//uint8_t Hour, Min, Sec;
 
 static uint8_t ByteToBcd2(uint8_t Value){
   uint8_t bcdhigh = 0;
@@ -192,19 +184,4 @@ void liteRTC_grepDate(uint8_t *rDay, uint8_t *rDate, uint8_t *rMo, uint8_t *rYe)
 	*rDate = *rDate & 0x1F;// Clean out Day of week number from Date variable.
 }
 
-void main() {
-	CLK_CKDIVR = 0x00;// No clock Divider, MAX 16MHz
-	usart_init(9600); // usart using baudrate at 9600
-	SYSCFG_RMPCR1 &= (uint8_t)((uint8_t)((uint8_t)REMAP_Pin << 4) | (uint8_t)0x0F); //remap the non-exit pin of Tx and Rx of the UFQFPN20 package to the exit one.
-	SYSCFG_RMPCR1 |= (uint8_t)((uint16_t)REMAP_Pin & (uint16_t)0x00F0);
-	delay_ms(100);
-	liteRTC_Init();// init RTC system clock
-	printf(" Starting Lite RTC...\n");
-	delay_ms(1000);
-	liteRTC_SetHMS(6, 9, 6);// Set time
-    while (1) {
-	liteRTC_grepTime(&Hour, &Min, &Sec);
-	printf("Current Time is : %d : %d : %d\n",Hour, Min, Sec);
-	delay_ms(999);
-    }
-}
+
