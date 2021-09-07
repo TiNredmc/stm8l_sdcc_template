@@ -7,7 +7,7 @@
 #include <stm8l.h>
 #include <string.h>
 
-//uint8_t Hour, Min, Sec;
+
 
 static uint8_t ByteToBcd2(uint8_t Value){
   uint8_t bcdhigh = 0;
@@ -33,7 +33,7 @@ void liteRTC_Init(){ // initialize the clock stuff, and Start RTC
 CLK_ICKCR=(1 << CLK_ICKCR_LSION);// turn LowSpeedInternal Clock
 while (!(CLK_ICKCR & (1 << CLK_ICKCR_LSIRDY)));  // enable LSI oscillator.  
 
-delay_ms(1000); // wait for the LSI clock to stable 	
+//delay_ms(1000); // wait for the LSI clock to stable 	
 
 CLK_CRTCR = 0x04; //set the RTC clock to LSI clock and set the divider at 1 
 CLK_PCKENR2 |= (1 << 2);// enable rtc clock
@@ -49,7 +49,7 @@ CLK_PCKENR2 |= (1 << 2);// enable rtc clock
   {
     /* Set the Initialization mode */
     RTC_ISR1 |= (uint8_t)(1 << 7);
-    printf("RTC inited/n");
+
     /* Wait until INITF flag is set */
     while ((RTC_ISR1 & (1 << 6)) && ( initfcount != 0xFFFF))
     {
@@ -133,7 +133,7 @@ void liteRTC_SetHMS(uint8_t SetHour, uint8_t SetMinute, uint8_t SetSecond){// Se
   {
     /* Set the Initialization mode */
     RTC_ISR1 |= (uint8_t)(1 << 7);
-    printf("RTC Inited for time update\n");
+    
     /* Wait until INITF flag is set */
     while ((RTC_ISR1 & (1 << 6)) && ( initfcount != 0xFFFF))
     {
