@@ -180,8 +180,8 @@ void liteRTC_grepDate(uint8_t *rDay, uint8_t *rDate, uint8_t *rMo, uint8_t *rYe)
 	*rMo = Bcd2ToByte(RTC_DR2);
 	*rYe = Bcd2ToByte(RTC_DR3);
 	
-	*rDay = *rDate << 5;// Grep Day of week number
-	*rDate = *rDate & 0x1F;// Clean out Day of week number from Date variable.
+	*rDay = *rMo << 5;// Grep Day of week number
+	*rMo = *rMo & 0x1F;// Clean out Day of week number from Month variable.
 }
 
 
