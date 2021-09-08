@@ -194,12 +194,11 @@ void EPW_Update(){
 	
 for (uint8_t p=0; p < 2; p++){// Do this twice for 2 mem pages.
 	// Byte Flip 90 degree
-	for (uint8_t FBOff = 0; FBOff < 16; FBOff ++){// 16 bytes column of FB0.
-		for (uint8_t i=0; i < 8; i++){// read each bit of every byte from FB0.
-			for (uint8_t j=0; j < 8; j++){// Single bit of FB0 every 16n byte is rotated to vertical byte 
-				PG[FBOff+1] |= ( ( FB0[(16*j) /*Row select*/ +(FBOff/8) /*Horizontal offset, move to next FB0 byte every 8 column*/ + (p ? EPW_FB_HALFSIZE : 0) /* Page changing */ ] && (1 << (i%8)) ) << j);
+	for (uint8_t FBOff = 0; FBOff < 128; FBOff ++){// 128 columns (for each verical byte PB[]).
+			for (uint8_t i=0; i < 8; i++){// Single bit of FB0 every 16n byte is rotated to vertical byte 
+				PG[FBOff+1] |= ( ( FB0[(16*i) /*Row select*/ +(FBOff/8) /*Horizontal offset, move to next FB0 byte every 8 column*/ + (p ? EPW_FB_HALFSIZE : 0) /* Page changing */ ] && (1 << (FBOff%8)) ) << i);
 			}
-		}
+
 	}
 				// select Memory page before updating.
 	EPW_sendCMD(p ? EPW_PGSEL_1 : EPW_PGSEL_0);// Select whether to send to Page number 0 or 1.
