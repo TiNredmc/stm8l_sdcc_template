@@ -167,14 +167,15 @@ void EPW_start(){
 	delay_ms(1);
 	EPW_sendCMD2(EPW_SETCONT, EPW_CONT);// set contrast. 
 	EPW_sendCMD2(EPW_SETVCOM, EPW_VCOM);// select VCOMH/IREF.
-	EPW_sendCMD2(EPW_SETOSC,	EPW_OSC);// set Clock Divide Raton and Oscillator Freq .
-	EPW_sendCMD2(EPW_SETPCW, EPW_PCW);// set Precharge Width.
+	EPW_sendCMD2(EPW_SETOSC,  EPW_OSC);// set Clock Divide Ratio and Oscillator Freq .
+	EPW_sendCMD2(EPW_SETPCW,  EPW_PCW);// set Precharge Width.
 	EPW_sendCMD2(EPW_SETVCDE, EPW_VCDE);// set VCOMH Deselect Level.
 	EPW_sendCMD2(EPW_SETMUXR, EPW_MUXR);// set Mux Ratio.
 	EPW_sendCMD2(EPW_SETDSOF, EPW_DSOF);// set Display offset.
-	EPW_sendCMD2(EPW_SETPAM,	EPW_PAM);// set Memory addressing mode to Page address (2 pages, 8 bit width each).
+	EPW_sendCMD2(EPW_SETPAM,  EPW_PAM);// set Memory addressing mode to Page address (2 pages, 8 bit width each).
 	
-	EPW_sendCMD(EPW_Wake);// Turn display on.
+	// Turn display on.
+	EPW_sendCMD(EPW_Wake);
 }
 
 // Turn Display on/off (for standby mode). 
@@ -266,6 +267,8 @@ while(*txtBuf){
 	if ((Xcol > 16) || *txtBuf == 0x0A){
 		Xcol = 1;// Move cursor to most left
 		YLine += 8;// enter new line
+		if(YLine > 9)// if new line is out of display bound 
+			YLine = 1;// roll it back to the top.
 		txtBuf++;// move to next char
 	}
 
