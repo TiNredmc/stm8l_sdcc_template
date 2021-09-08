@@ -68,7 +68,10 @@
 #define EPW_PAM			0x02 // Page Addressing Mode (default)
 /* end init sequence commands */
 
-#define EPW_SEGREMP		0xA0 // command to set segment remap (default). 
+#define EPW_SEGREMP_RH	0xA0 // command to set segment remap (Don't swap column 0 with 127 (and so on), We're using right hand mode).
+#define EPW_SEGREMP_LH 	0x01 // Do the reverse of 0xA0 (This will be used when define LEFT_HANDED.
+
+#define EPW_ROWRV		0xC8 // command to reverse row, Using this with right handed.
 
 #define EPW_PGSEL_0		0xB0 // select Page 0 (pixel row 0 to 7).
 
@@ -181,12 +184,14 @@ void EPW_start(){
 	
 	// On display setup (for left/right handed).
 #ifdef LEFT_HANDED
-	EPW_sendCMD(0xA1);// swap the column when put this watch on left hand
+	EPW_sendCMD(EPW_SEGREMP_LH);// swap the column when put this watch on left hand
+#else
+	EPW_sendCMD(EPW_SEGREMP_RH);// Don't swap the column because we're using right handed mode.
 #endif 
 	EPW_sendCMD2(EPW_SETMUXR, EPW_MUXR);// set Mux Ratio to 15 (because the Display has row 0 to row 15).
 	EPW_sendCMD2(EPW_SETDSOF, EPW_DSOF);// set Display column offset.
 #ifndef LEFT_HANDED
-	EPW_sendCMD(0xC8);// Reverse row (segment) for right handed.
+	EPW_sendCMD(EPW_ROWRV);// Reverse row (segment) for right handed.
 #endif 
 	EPW_sendCMD2(EPW_SETPHC,  EPW_PHC);// set Pin Hardware configuration for setting segment order
 	EPW_sendCMD2(EPW_SETPAM,  EPW_PAM);// set Memory addressing mode to Page address (2 pages, 8 bit width each).
@@ -218,6 +223,7 @@ for (uint8_t p=0; p < 2; p++){// Do this twice for 2 mem pages.
 	}
 				// select Memory page before updating.
 	EPW_sendCMD(p ? EPW_PGSEL_1 : EPW_PGSEL_0);// Select whether to send to Page number 0 or 1.
+	EPW_sendCMD2(0x00, 0x10);// Start to segment 0 (by setting the low, high column address).
 	
 	i2c_start();// generate start condition.
 	
