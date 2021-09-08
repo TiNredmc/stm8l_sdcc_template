@@ -232,7 +232,7 @@ void EPW_Clear(){
 
 // Fill entire Frame Buffer with 1
 void EPW_Fill(){
-	memset(FB0, 1, EPW_FB_SIZE);
+	memset(FB0, 0xFF, EPW_FB_SIZE);
 }
 
 // Buffer update (with X,Y Coordinate and image WxH) X,Y Coordinate start at (1,1) to (16,128)
