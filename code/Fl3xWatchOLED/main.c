@@ -23,12 +23,12 @@
 // 10Volt boost enable pin of TPS63060 (Dev version) or LTC3459 (Watch version).
 #define EPW_VBOOST		5// PC5
 
-// Definitions of EPW14040AA1
+// Necessary Definitions of EPW14040AA1
 #define EPW_FB_SIZE 	256 	// define the memory size used for Frame Buffer (128x2 bytes = 256 bytes).
 
 #define EPW_FB_HALFSIZE 128 // define the memory size used for the Send buffer.
 
-#define EPW_ADDR 		0x78 // 7bit address already.
+#define EPW_ADDR 		0x78 // 7bit i2c address already.
 
 #define EPW_CMD_MODE 	0x80 // First byte to send before sending any command-related byte.
 
@@ -37,12 +37,12 @@
 #define EPW_Sleep		0xAE // command to turn display off (sleep).
 #define EPW_Wake		0xAF // command to turn display on (wake from sleep).
 
-/* init sequence commands */
-// DON'T CHANGE THE PARAMETER, THESE PARAMS ARE FIXED BY MANUFACTURER !
+/* init commands sequence*/
 
 #define EPW_SETCONT		0x81 // command to set contrast.
-#define EPW_CONT		0x48 // contras value that need to be set.
+#define EPW_CONT		0x48 // contras value that need to be set. Might tinkering with this later.
 
+// DON'T CHANGE THE PARAMETER, THESE PARAMS ARE FIXED BY MANUFACTURER !
 #define EPW_SETVCOM		0xAD // command to set VCOMH.
 #define EPW_VCOM		0x10 // enable Iref during power on and use internal VCOM (according to SSD 1316 datasheet).
 
@@ -54,6 +54,10 @@
 
 #define EPW_SETVCDE		0xDB // command to set VCOMH Deselect Level.
 #define EPW_VCDE		0x30 // ~0.83 * Vcc.
+// End manufacture stuffs 
+ 
+#define EPW_SEGREMP_RH	0xA0 // command to set segment remap (Don't swap column 0 with 127 (and so on), We're using right hand mode).
+#define EPW_SEGREMP_LH 	0x01 // Do the reverse of 0xA0 (This will be used when define LEFT_HANDED.
 
 #define EPW_SETMUXR		0xA8 // command to set Multiplex Ratio.
 #define EPW_MUXR		0x0F // 23 + 1 Mux (?).
@@ -61,27 +65,24 @@
 #define EPW_SETDSOF		0xD3 // command to Display offset.
 #define EPW_DSOF		0x1F // vertical shift by COM from 38.
 
-#define EPW_SETPHC		0xDA // command to se t Pin Hardware Configuration.
+#define EPW_ROWRV		0xC8 // command to reverse row, Using this with right handed.
+
+#define EPW_SETPHC		0xDA // command to set Pin Hardware Configuration.
 #define EPW_PHC			0x12 // Alternative SEG pin configuration and Disable SEG left/right remap.
 
 #define EPW_SETPAM		0x20 // command to set memory addressing mode.
 #define EPW_PAM			0x02 // Page Addressing Mode (default)
 /* end init sequence commands */
 
-#define EPW_SEGREMP_RH	0xA0 // command to set segment remap (Don't swap column 0 with 127 (and so on), We're using right hand mode).
-#define EPW_SEGREMP_LH 	0x01 // Do the reverse of 0xA0 (This will be used when define LEFT_HANDED.
-
-#define EPW_ROWRV		0xC8 // command to reverse row, Using this with right handed.
-
+// Memory related commands for Page update.
 #define EPW_PGSEL_0		0xB0 // select Page 0 (pixel row 0 to 7).
 
 #define EPW_PGSEL_1		0xB1 // select Page 1 (pixel row 8 to 15).
 
 
-#define SCREEN_TIMEOUT	5*2 // screen timeout 5 secs. since we use .5s counter (1 second counter is counting up 2 times).
+/* Graphic related stuffs */
 
-// allocate mem for screen buffer 
-
+// allocate mem for screen buffer
 // 16 column bytes and 16 rows 
 uint8_t FB0[EPW_FB_SIZE]={0};// standard horizontal byte format Frame buffer
 
@@ -92,15 +93,22 @@ static uint8_t PG[EPW_FB_HALFSIZE];// single page vertical byte format for data 
 static uint8_t YLine = 1;
 static uint8_t Xcol = 1;
 
+/* Wakeup interrupt and menu navigation stuffs */
+
 // store PB_IDR to this variable to further detect which button is pushed/pressed. 
 volatile uint8_t readPin = 0;
+
 // press center button to enter time update mode.
 uint8_t TimeUpdate_lock = 0;
+
 // keeping track of menu (button press cycle).
 uint8_t menuTrack = 0;
 #define MAX_MENU	2 // maximum menu pages
 
+#define SCREEN_TIMEOUT	5*2 // screen timeout 5 secs. since we use .5s counter (1 second counter is counting up 2 times).
 volatile uint8_t countdown = 0;// screen timout keeper.
+
+/* Date and Time stuffs */
 
 // Time keeping, read from RTC shadow registries.
 uint8_t hour, minute, second;
@@ -112,7 +120,7 @@ uint8_t Day, Date, Month, Year;
 const static uint8_t DayNames[7]={"SUN", "MON", "TUE", "WEN", "THU", "FRI", "SAT"};
 uint8_t num2DMY[10]={0,0, 0x2f, 0,0, 0x2f, '2','0', 0, 0};// store the date, month and year in cahr format "DD/MM/20YY"
 
-
+/* Extra */
 // External function, fast memcpy (Big thanks lujji for making this possible). check the fastmemcpy.s on the same folder for assembly code.
 extern void fast_memcpy(uint8_t *dest, uint8_t *src, uint8_t len);
 
@@ -306,7 +314,7 @@ while(*txtBuf){
 
 //========================================================================================================================
 
-// Timer setup (for sleep time out counter)
+// Entry: Timer setup (for sleep time out counter)
 //========================================================================================================================
 void TIM4_counter_init(){// We are using TIM4 as a screen timeout counter
 	CLK_PCKENR1 |= 0x04;// enable the TIM4 clock
@@ -314,17 +322,21 @@ void TIM4_counter_init(){// We are using TIM4 as a screen timeout counter
 
 //========================================================================================================================
 
+// Entry: User Interface stuffs 
+//========================================================================================================================
+
 // Interrupt Handler for PortB smd joy stick switches.
 void joystick_irq(void) __interrupt(6){
 	readPin = PB_IDR;// quickly read the GPIO for further mode select.
 	
 	//reset_countdown_timer
-	TIM4_SR = (uint8_t)(~(0x01));// reset sleep cont down timer when pressing button.
+	TIM4_SR = (uint8_t)(~(0x01));// reset sleep countdown timer when pressing button.
 	countdown = TIM4_CNTR;// recount timer.
 	
 	EXTI_SR2 = 0x01;// clear interrupt pending bit of PortB interrupt.
 }
 
+// Read Hour, Minute and Second of the time shadow registries.
 void watch_readTime(uint8_t *timebuf){
 			second = RTC_TR1;
 			minute = RTC_TR2;
@@ -341,6 +353,7 @@ void watch_readTime(uint8_t *timebuf){
 			timebuf[7] = (hour & 0x0F) + 0x30;// convert the ones digit to char 
 }
 
+// Read Day of week, Day, Month and last 2 digits of Year of the time shadow registries.
 void watch_readDate(uint8_t *datebuf){
 	
 			Date = RTC_DR1;
@@ -360,7 +373,7 @@ void watch_readDate(uint8_t *datebuf){
 			datebuf[9] = (Year & 0xF0) + 0x30;
 }
 
-// Update Time and Date.
+// Update Time (and Date).
 void watch_timeUpdate(){
 	
 	EPW_Print("Adjust Time:\n");
@@ -420,7 +433,7 @@ void watch_timeUpdate(){
 							break;
 						case 8:
 								num2Char[7]++;
-								if(num2Char[7] > 9)// minute's tens digit can't be more than 9.
+								if(num2Char[7] > 9)// minute's ones digit can't be more than 9.
 									num2Char[7] = 0;
 							break;
 						default:
@@ -478,7 +491,7 @@ void watch_timeUpdate(){
 			default:
 				break;
 		}
-
+	EPW_LoadPart(font8x8_basic + (char)'_', Xcol, YLine, 1, 8);// underscore the currently selected digit.
 	EPW_Print(num2Char);
 	EPW_Update();// Update display
 	}
@@ -541,7 +554,7 @@ void watch_handler(){
 			TimeUpdate_lock +=1;
 				if(TimeUpdate_lock == 2){
 					TimeUpdate_lock = 0;// release Time update lock.
-					//watch_timeUpdate();
+					watch_timeUpdate();// enter time update mode 
 				}
 			break;
 		case 0xF7:// Right button is pressed.
@@ -577,10 +590,18 @@ void watch_handler(){
 	__asm__("halt");// halt CPU, Now in active halt mode. Only RTC and ITC are running.
 }
 
+//========================================================================================================================
+
+
+// Entry: Main 
+//========================================================================================================================
+
 void main(){
 	GPIO_init();// GPIO Init
 	i2c_init(0x00, I2C_400K);// I2C at 400KHz
 	TIM4_counter_init();// Enable TIM4 clock for Screen timeout timer.
+	PWR_CSR2 |= (1 << 1);// disable ADC ref voltage regulator when sleeping. (No effect sine we don't use ADC).
+	
 	__asm__("rim");// enable interrupt controller.
 	// Clean Frame Buffer for Fresh init.
 	EPW_Clear();
