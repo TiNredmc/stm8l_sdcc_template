@@ -88,12 +88,12 @@ static uint8_t Xcol = 1;
 // store PB_IDR to this variable to further detect which button is pushed/pressed. 
 volatile uint8_t readPin = 0;
 // press center button to enter time update mode.
-volatile uint8_t TimeUpdate_lock = 0;
+uint8_t TimeUpdate_lock = 0;
 // keeping track of menu (button press cycle).
 uint8_t menuTrack = 0;
 #define MAX_MENU	2 // maximum menu pages
 
-uint8_t countdown = 0;// screen timout keeper.
+volatile uint8_t countdown = 0;// screen timout keeper.
 
 // Time keeping, read from RTC shadow registries.
 uint8_t hour, minute, second;
