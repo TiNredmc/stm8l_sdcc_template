@@ -58,7 +58,7 @@ CLK_PCKENR2 |= (1 << 2);// enable rtc clock
   }
 
 	//set Hour format to 24 hour
-	RTC_CR1 &= (0 << 6);
+	RTC_CR1 &= ~(1 << 6);
 	//Direct R/W on the TRs and DRs reg, By setting bit 4 (BYPSHAD) to 1 
 	RTC_CR1 |= (1 << 4);
 
