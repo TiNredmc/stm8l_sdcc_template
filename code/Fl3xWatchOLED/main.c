@@ -13,6 +13,10 @@
 
 #include <font8x8_basic.h>
 
+// Define Left hand mode for who want to wear this on left hand.
+// 9.9 in 10 people wears watch on left hand. I'm the 0.1 who wear on right hand.
+//#define LEFT_HANDED
+
 // Define pin to use 
 // RSTB
 #define EPW_RSTB		4// PC4
@@ -174,8 +178,17 @@ void EPW_start(){
 	EPW_sendCMD2(EPW_SETOSC,  EPW_OSC);// set Clock Divide Ratio and Oscillator Freq .
 	EPW_sendCMD2(EPW_SETPCW,  EPW_PCW);// set Precharge Width.
 	EPW_sendCMD2(EPW_SETVCDE, EPW_VCDE);// set VCOMH Deselect Level.
-	EPW_sendCMD2(EPW_SETMUXR, EPW_MUXR);// set Mux Ratio.
-	EPW_sendCMD2(EPW_SETDSOF, EPW_DSOF);// set Display offset.
+	
+	// On display setup (for left/right handed).
+#ifdef LEFT_HANDED
+	EPW_sendCMD(0xA1);// swap the column when put this watch on left hand
+#endif 
+	EPW_sendCMD2(EPW_SETMUXR, EPW_MUXR);// set Mux Ratio to 15 (because the Display has row 0 to row 15).
+	EPW_sendCMD2(EPW_SETDSOF, EPW_DSOF);// set Display column offset.
+#ifndef LEFT_HANDED
+	EPW_sendCMD(0xC8);// Reverse row (segment) for right handed.
+#endif 
+	EPW_sendCMD2(EPW_SETPHC,  EPW_PHC);// set Pin Hardware configuration for setting segment order
 	EPW_sendCMD2(EPW_SETPAM,  EPW_PAM);// set Memory addressing mode to Page address (2 pages, 8 bit width each).
 	
 	// Turn display on.
