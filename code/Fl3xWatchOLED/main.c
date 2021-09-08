@@ -105,6 +105,10 @@ uint8_t Day, Date, Month, Year;
 const static uint8_t DayNames[7]={"SUN", "MON", "TUE", "WEN", "THU", "FRI", "SAT"};
 uint8_t num2DMY[10]={0,0, 0x2f, 0,0, 0x2f, '2','0', 0, 0};// store the date, month and year in cahr format "DD/MM/20YY"
 
+
+// External function, fast memcpy (Big thanks lujji for making this possible). check the fastmemcpy.s on the same folder for assembly code.
+extern void fast_memcpy(uint8_t *dest, uint8_t *src, uint8_t len);
+
 /* Low level stuffs */
 // GPIO init and interrupt 
 void GPIO_init(){
@@ -198,7 +202,6 @@ for (uint8_t p=0; p < 2; p++){// Do this twice for 2 mem pages.
 			for (uint8_t i=0; i < 8; i++){// Single bit of FB0 every 16n byte is rotated to vertical byte 
 				PG[FBOff+1] |= ( ( FB0[(16*i) /*Row select*/ +(FBOff/8) /*Horizontal offset, move to next FB0 byte every 8 column*/ + (p ? EPW_FB_HALFSIZE : 0) /* Page changing */ ] && (1 << (FBOff%8)) ) << i);
 			}
-
 	}
 				// select Memory page before updating.
 	EPW_sendCMD(p ? EPW_PGSEL_1 : EPW_PGSEL_0);// Select whether to send to Page number 0 or 1.
@@ -232,7 +235,7 @@ void EPW_Fill(){
 	memset(FB0, 1, EPW_FB_SIZE);
 }
 
-// Buffer update (with X,Y Coordinate and image WxH) X,Y Coordinate start at (1,1) to (50,240)
+// Buffer update (with X,Y Coordinate and image WxH) X,Y Coordinate start at (1,1) to (16,128)
 //
 //NOTE THAT THE X COOR and WIDTH ARE BYTE NUMBER NOT PIXEL NUMBER (8 pixel = 1 byte). A.K.A IT'S BYTE ALIGNED
 //
@@ -250,7 +253,7 @@ void EPW_LoadPart(uint8_t* BMP, uint8_t Xcord, uint8_t Ycord, uint8_t bmpW, uint
 
 		// turn W and H into absolute offset number for Bitmap image
 		//WHoff = loop * bmpW;
-		memcpy(FB0 + ((Ycord + loop) * 128), BMP + (loop * bmpW), bmpW);
+		fast_memcpy(FB0 + ((Ycord + loop) * 128), BMP + (loop * bmpW), bmpW);
 	}
 
 }
