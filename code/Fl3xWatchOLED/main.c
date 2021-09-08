@@ -248,12 +248,12 @@ void EPW_LoadPart(uint8_t* BMP, uint8_t Xcord, uint8_t Ycord, uint8_t bmpW, uint
 	//Counting from Y origin point to bmpH using for loop
 	for(uint8_t loop = 0; loop < bmpH; loop++){
 		// turn X an Y into absolute offset number for Buffer
-		//XYoff = (Ycord+loop) * 128;
+		//XYoff = (Ycord+loop) * 16;
 		//XYoff += Xcord;// offset start at the left most, The count from left to right for Xcord times
 
 		// turn W and H into absolute offset number for Bitmap image
 		//WHoff = loop * bmpW;
-		fast_memcpy(FB0 + ((Ycord + loop) * 128), BMP + (loop * bmpW), bmpW);
+		fast_memcpy(FB0 + ((Ycord + loop) * 16), BMP + (loop * bmpW), bmpW);
 	}
 
 }
