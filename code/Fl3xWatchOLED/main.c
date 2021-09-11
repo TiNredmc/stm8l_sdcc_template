@@ -60,7 +60,7 @@
 #define EPW_SEGREMP_LH 	0xA1 // Do the reverse of 0xA0 (This will be used when define LEFT_HANDED.
 
 #define EPW_SETMUXR		0xA8 // command to set Multiplex Ratio.
-#define EPW_MUXR		0x0F // 23 + 1 Mux (?).
+#define EPW_MUXR		0x0F // 15 + 1 Mux (16 com/row strating from 0 - 15).
 
 #define EPW_SETDSOF		0xD3 // command to Display offset.
 #define EPW_DSOF		0x1F // vertical shift by COM from 38.
@@ -120,6 +120,10 @@ uint8_t Day, Date, Month, Year;
 const static uint8_t DayNames[7]={"SUN", "MON", "TUE", "WEN", "THU", "FRI", "SAT"};
 uint8_t num2DMY[10]={0,0, 0x2f, 0,0, 0x2f, '2','0', 0, 0};// store the date, month and year in cahr format "DD/MM/20YY"
 
+// Look up tables for Cursor selection
+const static uint8_t tLUT[8] = {0,1 ,0 ,3,4 ,0 ,6,7};// LUT for time update 
+const static uint8_t dLUT[10] = {0,1 ,0 ,3,4 ,0 ,0 ,0 ,8,9};// LUT for date update
+
 /* Extra */
 // External function, fast memcpy (Big thanks lujji for making this possible). check the fastmemcpy.s on the same folder for assembly code.
 extern void fast_memcpy(uint8_t *dest, uint8_t *src, uint8_t len);
@@ -131,11 +135,12 @@ void GPIO_init(){
 	// Init Port C for RSTB and Vboost .
 	PC_DDR |= (1 << EPW_RSTB) | (1 << EPW_VBOOST);// Set PC4,5 as output
 	PC_CR1 |= (1 << EPW_RSTB) | (1 << EPW_VBOOST);// with push pull mode.
+	PC_CR1 |= 0x40;// configure PB6 as input pull up, This will stop noise from triggering Schimitt trigger (low power design).
 	
-	// Init port B0 to B4 as a input with PortB interrupt.
-	PB_DDR &= ~0x1F;// PB0-PB4 as input
-	PB_CR1 = 0x1F;// With pull up resistor.
-	PB_CR2 = 0x1F;// and Interrupt
+	// Init entire port B as input but only B0 to B4 as a input with PortB interrupt.
+	PB_DDR = 0;// PB0-PB7 as input, We only use PB0-4 other pins just left unused with internal pull-up (low power design).
+	PB_CR1 = 0xFF;// Entire port With pull up resistor.
+	PB_CR2 = 0x1F;// and Interrupt only on PB0 to PB4.
 	
 	// Enable Port B interrupt.
 	ITC_SPR2 |= (3 << 4);// set VECT6SPR (Entire portB interrupt) priority to high.
@@ -143,7 +148,8 @@ void GPIO_init(){
 	//EXTI_CR1 = 0x00;// set interurpt to detect falling and low (Port0-3)
 	//EXTI_CR2 &= ~0x03;// set interrupt to detect falling and low (Port4).
 	
-	EXTI_CR3 &= ~0x03;// set interruot sensitivity to detect falling and low (PortB).
+	// We need to do the EXTI setup in sequence.
+	EXTI_CR3 &= ~0x03;// set interrupt sensitivity to detect falling and low (PortB).
 	EXTI_CONF1 |= 0x03;// Enable Port B interrupt source.
 	EXTI_CONF2 &= (uint8_t)~0x20;// Port B instead of Port G is used for interrupt generation.
 }
@@ -314,14 +320,6 @@ while(*txtBuf){
 
 //========================================================================================================================
 
-// Entry: Timer setup (for sleep time out counter)
-//========================================================================================================================
-void TIM4_counter_init(){// We are using TIM4 as a screen timeout counter
-	CLK_PCKENR1 |= 0x04;// enable the TIM4 clock
-}
-
-//========================================================================================================================
-
 // Entry: User Interface stuffs 
 //========================================================================================================================
 
@@ -373,126 +371,139 @@ void watch_readDate(uint8_t *datebuf){
 			datebuf[9] = (Year & 0xF0) + 0x30;
 }
 
-// Update Time (and Date).
-void watch_timeUpdate(){
+// Update Time and Date.
+void watch_Update(){
 	
-	EPW_Print("Adjust Time:\n");
-	countdown = TIM4_CNTR;
+	if(menuTrack == 0)
+		EPW_Print("Adjust Time:\n");// Menu number 0 : Time.
+	else 
+		EPW_Print("Adjust Date:\n");// Menu number 1 : Date.
+	
+	countdown = TIM4_CNTR;// first lap.
 	
 	while ((TIM4_CNTR - countdown) < SCREEN_TIMEOUT){
 		switch(readPin){
 			case 0xF7: // right button is pressed.
 				// move cursor forward.
 				Xcol++;
-				if ((Xcol == 3) || (Xcol == 6))// Cursor never lands on ':'.
-					Xcol++;
-				if (Xcol > 16)// Cursor never goes beyond 16.
-					Xcol = 16;
+				
+				if(menuTrack == 0){
+					if ((Xcol == 3) || (Xcol == 6))// Cursor never lands on ':' (Time) or '/' (Date). 
+						Xcol++;
+				}else{
+					if ((Xcol == 4)  || (Xcol == 12)) 
+						Xcol += 2;
+					
+					if ((Xcol == 5) || (Xcol == 13) || (Xcol == 8))
+						Xcol++;
+					
+					if (Xcol == 11)
+						Xcol += 3;
+				}	
+					
+				if (Xcol > (menuTrack ? 15 : 8))// Cursor never goes beyond 8 (Time) or 15 (Date).
+					Xcol = menuTrack ? 15 : 8;
 				break;
 				
 			case 0xFE: // left button is pressed.
 				// move cursor backward.
 				if (Xcol == 1)// Cursor never goes backward beyond 1.
 					break;
+					
 				Xcol--;
-				if ((Xcol == 3) || (Xcol == 6))// Cursor never lands on ':'. 
-					Xcol--;
+				if(menuTrack == 0){
+					if ((Xcol == 3) || (Xcol == 6))// Cursor never lands on ':' (Time) or '/' (Date). 
+						Xcol--;
+				}else{
+					if ((Xcol == 4) || (Xcol == 8) || (Xcol == 11)) 
+						Xcol--;
+					
+					if ((Xcol == 5) || (Xcol == 12)) 
+						Xcol -= 2;
+					
+					if (Xcol == 13)
+						Xcol -= 3;
+				}	
+					
 				break;
 			
 			case 0xFB: // Up button is pressed.
 				// Increase value (of that digit).
-					switch(Xcol){
-						case 1:
-								num2Char[0]++;
-								if(num2Char[0] > 2)// hour's tens digit can't be more than 2.
-									num2Char[0] = 0;
-							break;
-						case 2:
-								num2Char[1]++;
-								if((num2Char[0] == 2) && (num2Char[1] > 3))// If it's more than 19 o'clock, ones digit can't be more than 3.
-									num2Char[1] = 0;
-								
-								if(num2Char[1] > 9)// hour's ones digit can't be more than 9
-									num2Char[1] = 0;
-
-							break;
-						case 4:
-								num2Char[3]++;
-								if(num2Char[3] > 5)// minute's tens digit can't be more than 5.
-									num2Char[3] = 0;
-							break;
-						case 5:
-								num2Char[4]++;
-								if(num2Char[4] > 9)// minute's ones digit can't be more than 9.
-									num2Char[4] = 0;
-							break;
-						case 7:
-								num2Char[6]++;
-								if(num2Char[6] > 5)// minute's tens digit can't be more than 5.
-									num2Char[6] = 0;
-							break;
-						case 8:
-								num2Char[7]++;
-								if(num2Char[7] > 9)// minute's ones digit can't be more than 9.
-									num2Char[7] = 0;
-							break;
-						default:
-							break;
+				if(menuTrack == 0){
+					// Time Update
+					num2Char[tLUT[Xcol-1]]++;
+					
+					// Explicitly check whether the number is out of bound. 
+					// Hour maximum is 23
+					num2Char[0] = (num2Char[0] > 2) ? 2 : num2Char[0];
+					num2Char[1] = (num2Char[1] > 9) ? 9 : num2Char[1];
+					num2Char[1] = ((num2Char[1] > 3) && (num2Char[0] ==2)) ? 3 : num2Char[1];// make sure we don't goes further than 23.
+					// Minute maximum is 59
+					num2Char[3] = (num2Char[3] > 5) ? 5 : num2Char[3];
+					num2Char[4] = (num2Char[4] > 9) ? 9 : num2Char[4];
+					// Second maximum is 59 
+					num2Char[6] = (num2Char[6] > 5) ? 5 : num2Char[6];
+					num2Char[7] = (num2Char[7] > 9) ? 9 : num2Char[7];
+					
+				}else{
+					// Date update
+					if(Xcol < 4){// column is in region of Day of week.
+						Day++;
+						if(Day > 6)
+							Day = 6;
+					}else{
+						num2DMY[dLUT[Xcol-6]]++;
+						
+						// Explicitly check whether the number is out of bound. 
+						// Date maximum is 31, Leap year workaround soon.
+						num2DMY[0] = (num2DMY[0] > 2) ? 2 : num2DMY[0];
+						num2DMY[1] = (num2DMY[1] > 3) ? 3 : num2Char[1];
+						// Month maximum is 12
+						num2DMY[3] = (num2DMY[3] > 1) ? 1 : num2DMY[3];
+						num2DMY[4] = (num2DMY[4] > 9) ? 9 : num2DMY[4];
+						num2DMY[4] = ((num2DMY[4] > 2) && (num2DMY[3] == 1)) ? 2 : num2DMY[4];// make sure we don't goes further than 12. 
+						// Year maximum is 99 
+						num2DMY[8] = (num2DMY[8] > 9) ? 9 : num2DMY[8];
+						num2DMY[9] = (num2DMY[9] > 9) ? 9 : num2DMY[9];
 					}
+				}
 				break;
 			
 			case 0xEF: // Down button is pressed.
 				// Decrease value (of that digit).
-								switch(Xcol){
-						case 1:
-								num2Char[0]--;
-								if(num2Char[0] > 2)// hour's tens digit can't be more than 2.
-									num2Char[0] = 0;
+				if(menuTrack == 0){
+					if(num2Char[tLUT[Xcol-1]] == 0)// never goes below 0 and get rick roll over.
+						break;
+					num2Char[tLUT[Xcol]]--;
+				}else{
+					if(Xcol < 4){// column is in region of Day of week.
+						if(Day == 0)
 							break;
-						case 2:
-								num2Char[1]--;
-								if((num2Char[0] == 2) && (num2Char[1] > 3))// If it's more than 19 o'clock, ones digit can't be more than 3.
-									num2Char[1] = 0;
-								
-								if(num2Char[1] > 9)// hour's ones digit can't be more than 9.
-									num2Char[1] = 0;
+						Day--;
+					}else{
+						if(num2DMY[dLUT[Xcol-6]] == 0)// never goes below 0 and get rick roll over.
 							break;
-						case 4:
-								num2Char[3]--;
-								if(num2Char[3] > 5)// minute's tens digit can't be more than 5.
-									num2Char[3] = 0;
-							break;
-						case 5:
-								num2Char[4]--;
-								if(num2Char[4] > 9)// hour's ones digit can't be more than 9.
-									num2Char[4] = 0;
-							break;
-						case 7:
-								num2Char[6]--;
-								if(num2Char[6] > 5)// minute's tens digit can't be more than 5.
-									num2Char[6] = 0;
-							break;
-						case 8:
-								num2Char[7]--;
-								if(num2Char[7] > 9)// hour's ones digit can't be more than 9.
-									num2Char[7] = 0;
-							break;
-						default:
-							break;
+						num2DMY[dLUT[Xcol-6]]--;
 					}
+				}
+				break;
 					
-				case 0xFC: // center button is pressed
-					// save Time setting.
+			case 0xFC: // center button is pressed
+					// save Time/Date setting.
+				if(menuTrack == 0)
 					liteRTC_SetHMS((num2Char[0]*10)+num2Char[1], (num2Char[3]*10)+num2Char[4], (num2Char[6]*10)+num2Char[7]);
-					// reset the Cursor and line position, watch_showMenu() will redraw the text on the FB0.
-					YLine = 1;
-					Xcol = 1;
-					return;// exit the timeUpdate function
+				else
+					liteRTC_SetDMY(Day, (num2DMY[0]*10)+num2DMY[1], (num2DMY[3]*10)+num2DMY[4], (num2DMY[8]*10)+num2DMY[9]);
+				// reset the Cursor and line position, watch_showMenu() will redraw the text on the FB0.
+				YLine = 1;
+				Xcol = 1;
+				return;// exit the timeUpdate function
+				
 			default:
 				break;
 		}
 	EPW_LoadPart(font8x8_basic + (char)'_', Xcol, YLine, 1, 8);// underscore the currently selected digit.
-	EPW_Print(num2Char);
+	EPW_Print((menuTrack ? num2DMY : num2Char));
 	EPW_Update();// Update display
 	}
 }
@@ -536,7 +547,7 @@ void watch_handler(){
 	if(readPin != 0xFF){// if any pin is triggered interrupt
 			EPW_DispOn(true);// turn display on 
 	}
-	
+	CLK_PCKENR1 |= 0x04;// Enable TIM4 clock for Screen timeout timer.
 	// start counter for screen timeout.
 	TIM4_ARR = 243; //set prescaler period for 0.5s 
 	TIM4_PSCR = 0x0F;// set prescaler, divide sysclock to 488Hz for making 0.5s counter 
@@ -551,14 +562,14 @@ void watch_handler(){
 			
 		case 0xFC:// Center button is pressed.
 			TimeUpdate_lock +=1;
-				if(TimeUpdate_lock == 2){// If pressed 2 times 
+				if(TimeUpdate_lock == 2){// If pressed 2 times.
 					TimeUpdate_lock = 0;// release Time update lock.
-					watch_timeUpdate();// enter time update mode 
+					watch_Update();// enter time/date update mode.
 				}
 			break;
 			
 		case 0xF7:// Right button is pressed.
-			TimeUpdate_lock = 0;// release Tim update lock, make sure that pressing center accidentally wont trigger Tim Update
+			TimeUpdate_lock = 0;// release Tim update lock, make sure that pressing center accidentally won't trigger Tim Update.
 			menuTrack++;// navigate to next menu.
 			if(menuTrack > (MAX_MENU-1))
 				menuTrack = 0;
@@ -584,6 +595,7 @@ void watch_handler(){
 	TIM4_SR = (uint8_t)(~(0x01));
 	// Turn TIM4 off
 	TIM4_CR1 &= ~0x01;    
+	CLK_PCKENR1 &= (uint8_t)(~0x04);// Disable TIM4 clock before we go to sleep.
 	
 	// enter sleep mode.
 	EPW_DispOn(false);// turn display of via command then turn of the Boost IC.
@@ -599,7 +611,6 @@ void watch_handler(){
 void main(){
 	GPIO_init();// GPIO Init
 	i2c_init(0x00, I2C_400K);// I2C at 400KHz
-	TIM4_counter_init();// Enable TIM4 clock for Screen timeout timer.
 	PWR_CSR2 |= (1 << 1);// disable ADC ref voltage regulator when sleeping. (No effect sine we don't use ADC).
 	
 	__asm__("rim");// enable interrupt controller.
