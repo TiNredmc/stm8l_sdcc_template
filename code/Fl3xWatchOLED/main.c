@@ -437,15 +437,26 @@ void watch_Update(){
 					
 					// Explicitly check whether the number is out of bound. 
 					// Hour maximum is 23
-					num2Char[0] = (num2Char[0] > 2) ? 2 : num2Char[0];
-					num2Char[1] = (num2Char[1] > 9) ? 9 : num2Char[1];
-					num2Char[1] = ((num2Char[1] > 3) && (num2Char[0] ==2)) ? 3 : num2Char[1];// make sure we don't goes further than 23.
+					if(num2Char[0] > 2){// Hour tens digit can't be more than 2 
+						num2Char[0] = 2;
+						if(num2Char[1] > 3)// Hour can't be more than 23.
+							num2Char[1] = 3;
+						break;
+					}
+					if(num2Char[1] > 9)// When hour is between 0-19, ones digit can't be more than 9
+						num2Char[1] = 9;
+
 					// Minute maximum is 59
-					num2Char[3] = (num2Char[3] > 5) ? 5 : num2Char[3];
-					num2Char[4] = (num2Char[4] > 9) ? 9 : num2Char[4];
+					if(num2Char[3] > 5)
+						num2Char[3] = 5;
+					if(num2Char[4] > 9)
+						num2Char[4] = 9;
+					
 					// Second maximum is 59 
-					num2Char[6] = (num2Char[6] > 5) ? 5 : num2Char[6];
-					num2Char[7] = (num2Char[7] > 9) ? 9 : num2Char[7];
+					if(num2Char[6] > 5)
+						num2Char[6] = 5;
+					if(num2Char[7] > 9)
+						num2Char[7] = 9;
 					
 				}else{
 					// Date update
@@ -456,17 +467,49 @@ void watch_Update(){
 					}else{
 						num2DMY[dLUT[Xcol-6]]++;
 						
+						uint16_t year = 2000 + (num2DMY[8]*10 + num2DMY[9]);// store the number of year to calculate the leap year.
 						// Explicitly check whether the number is out of bound. 
 						// Date maximum is 31, Leap year workaround soon.
-						num2DMY[0] = (num2DMY[0] > 2) ? 2 : num2DMY[0];
-						num2DMY[1] = (num2DMY[1] > 3) ? 3 : num2Char[1];
+						if((num2DMY[3]*10 + num2DMY[4]) == 2){// Check if it's Feb.
+								if(num2DMY[0] > 2)
+									num2DMY[0] = 2;
+								
+								if( ((year%4) == 0) && (((year%400) == 0) || ( (year%100) != 0 )) ){// If it's leap year.
+									if(num2DMY[1] > 9) // Allow up to 29th Feb.
+										num2DMY[1] = 9;
+								}else{
+									if(num2DMY[1] > 8)// Otherwise It's only 28th Feb.
+										num2DMY[1] = 9;
+								}
+							
+						}else{
+							if(num2DMY[0] > 3)// tens digit of day can't be more than 3
+								num2DMY[0] = 3; 
+								
+							if(num2DMY[1] > 1)// Day can't be more than 31.
+								num2DMY[1] = 1;
+						}
+						
+						if(num2DMY[1] > 9)// When Day is between 1 and 29, ones digit can't be more than 9.
+							num2DMY[1] = 9;
+						
 						// Month maximum is 12
-						num2DMY[3] = (num2DMY[3] > 1) ? 1 : num2DMY[3];
-						num2DMY[4] = (num2DMY[4] > 9) ? 9 : num2DMY[4];
-						num2DMY[4] = ((num2DMY[4] > 2) && (num2DMY[3] == 1)) ? 2 : num2DMY[4];// make sure we don't goes further than 12. 
+						if(num2DMY[3] > 1){// tens digit of Month can't be more than 1
+							num2DMY[3] = 1;
+							
+							if(num2DMY[4] > 2)// Month can't be more than 12.
+								num2DMY[4] = 2;
+						}
+						
+						if(num2DMY[4] > 9)// When Month is between 1 and 9, ones digit can't be more than 9.
+							num2DMY[4] = 9;
+
 						// Year maximum is 99 
-						num2DMY[8] = (num2DMY[8] > 9) ? 9 : num2DMY[8];
-						num2DMY[9] = (num2DMY[9] > 9) ? 9 : num2DMY[9];
+						if(num2DMY[8] > 9)
+							num2DMY[8] = 9;
+						if(num2DMY[9] > 9)
+							num2DMY[9] = 9;
+								 
 					}
 				}
 				break;
@@ -558,7 +601,7 @@ void watch_handler(){
 	
 	CLK_PCKENR1 |= 0x04;// Enable TIM4 clock for Screen timeout timer.
 	// start counter for screen timeout.
-	TIM4_ARR = 243; //set prescaler period for 0.5s 
+	TIM4_ARR = 243; // set prescaler period for 0.5s 
 	TIM4_PSCR = 0x0F;// set prescaler, divide sysclock to 488Hz for making 0.5s counter 
 	TIM4_EGR = 0x01;// event source update 
 	// start timer 
