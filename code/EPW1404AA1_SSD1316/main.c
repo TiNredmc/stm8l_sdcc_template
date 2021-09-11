@@ -1,4 +1,4 @@
-/* EPW14040AA1 (SSD1316) driver code on STM8L
+/* EPW1404AA1 (based on SSD1316) driver code on STM8L
  * Coded by TinLethax 2021/08/25 +7
  */
 #include <stm8l.h>
@@ -14,7 +14,6 @@
 // Define Left hand mode for who want to wear this on left hand.
 // 9.9 in 10 people wears watch on left hand. I'm the 0.1 who wear on right hand.
 //#define LEFT_HANDED
-
 
 // Define pin to use 
 // RSTB
@@ -56,7 +55,7 @@
 // End manufacture stuffs 
  
 #define EPW_SEGREMP_RH	0xA0 // command to set segment remap (Don't swap column 0 with 127 (and so on), We're using right hand mode).
-#define EPW_SEGREMP_LH 	0x01 // Do the reverse of 0xA0 (This will be used when define LEFT_HANDED.
+#define EPW_SEGREMP_LH 	0xA1 // Do the reverse of 0xA0 (This will be used when define LEFT_HANDED.
 
 #define EPW_SETMUXR		0xA8 // command to set Multiplex Ratio.
 #define EPW_MUXR		0x0F // 23 + 1 Mux (?).
