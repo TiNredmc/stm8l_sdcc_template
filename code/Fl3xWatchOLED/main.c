@@ -57,7 +57,7 @@
 // End manufacture stuffs 
  
 #define EPW_SEGREMP_RH	0xA0 // command to set segment remap (Don't swap column 0 with 127 (and so on), We're using right hand mode).
-#define EPW_SEGREMP_LH 	0x01 // Do the reverse of 0xA0 (This will be used when define LEFT_HANDED.
+#define EPW_SEGREMP_LH 	0xA1 // Do the reverse of 0xA0 (This will be used when define LEFT_HANDED.
 
 #define EPW_SETMUXR		0xA8 // command to set Multiplex Ratio.
 #define EPW_MUXR		0x0F // 23 + 1 Mux (?).
@@ -487,7 +487,7 @@ void watch_timeUpdate(){
 					// reset the Cursor and line position, watch_showMenu() will redraw the text on the FB0.
 					YLine = 1;
 					Xcol = 1;
-					return;
+					return;// exit the timeUpdate function
 			default:
 				break;
 		}
@@ -512,7 +512,6 @@ void watch_showMenu(uint8_t menum){
 			// Print to Display and update
 			EPW_Print("Current Time:\n");
 			EPW_Print(num2Char);
-			EPW_Update();
 			break;
 		case 1:// show Day of week, Date Month and year.
 		
@@ -539,8 +538,8 @@ void watch_handler(){
 	}
 	
 	// start counter for screen timeout.
-	TIM4_ARR = 242; //set prescaler period for 0.5s 
-	TIM4_PSCR = 0x0F;// set prescaler, divide sysclock to 487Hz for making 0.5s counter 
+	TIM4_ARR = 243; //set prescaler period for 0.5s 
+	TIM4_PSCR = 0x0F;// set prescaler, divide sysclock to 488Hz for making 0.5s counter 
 	TIM4_EGR = 0x01;// event source update 
 	// start timer 
 	TIM4_CR1 |= 0x01;// the time at the starting point
@@ -552,11 +551,12 @@ void watch_handler(){
 			
 		case 0xFC:// Center button is pressed.
 			TimeUpdate_lock +=1;
-				if(TimeUpdate_lock == 2){
+				if(TimeUpdate_lock == 2){// If pressed 2 times 
 					TimeUpdate_lock = 0;// release Time update lock.
 					watch_timeUpdate();// enter time update mode 
 				}
 			break;
+			
 		case 0xF7:// Right button is pressed.
 			TimeUpdate_lock = 0;// release Tim update lock, make sure that pressing center accidentally wont trigger Tim Update
 			menuTrack++;// navigate to next menu.
