@@ -117,7 +117,7 @@ uint8_t num2Char[8]={0,0,':',0,0,':',0,0};// store the time in char format "HH:M
 // DMY keeping, read from RTC shadow registries.
 uint8_t Day, Date, Month, Year;
 // convert day of week number to day name.
-const static uint8_t DayNames[7]={"SUN", "MON", "TUE", "WEN", "THU", "FRI", "SAT"};
+const static uint8_t DayNames[7]={"MON", "TUE", "WEN", "THU", "FRI", "SAT", "SUN"};
 uint8_t num2DMY[10]={0,0, 0x2f, 0,0, 0x2f, '2','0', 0, 0};// store the date, month and year in cahr format "DD/MM/20YY"
 
 // Look up tables for Cursor selection
@@ -252,9 +252,10 @@ for (uint8_t p=0; p < 2; p++){// Do this twice for 2 mem pages.
 /* Graphic stuffs */
 
 // Load Graphic with same size as Frame Buffer into FB0
+/*
 void EPW_LoadFull(uint8_t *BMP){
 	memcpy(FB0, BMP, EPW_FB_SIZE);
-}
+}*/
 
 // Clear all pixels of Frame Buffer 
 void EPW_Clear(){
@@ -264,9 +265,10 @@ void EPW_Clear(){
 }
 
 // Fill entire Frame Buffer with 1
+/*
 void EPW_Fill(){
 	memset(FB0, 0xFF, EPW_FB_SIZE);
-}
+}*/
 
 // Buffer update (with X,Y Coordinate and image WxH) X,Y Coordinate start at (1,1) to (16,128)
 //
@@ -290,7 +292,6 @@ void EPW_LoadPart(uint8_t* BMP, uint8_t Xcord, uint8_t Ycord, uint8_t bmpW, uint
 	}
 
 }
-
 
 //Print 8x8 Text on screen
 void EPW_Print(char *txtBuf){
@@ -316,6 +317,7 @@ while(*txtBuf){
 	Xcol++;// move cursor to next column
 	}
   }
+  
 }
 
 //========================================================================================================================
@@ -449,8 +451,8 @@ void watch_Update(){
 					// Date update
 					if(Xcol < 4){// column is in region of Day of week.
 						Day++;
-						if(Day > 6)
-							Day = 6;
+						if(Day > 7)
+							Day = 7;
 					}else{
 						num2DMY[dLUT[Xcol-6]]++;
 						
@@ -477,7 +479,7 @@ void watch_Update(){
 					num2Char[tLUT[Xcol]]--;
 				}else{
 					if(Xcol < 4){// column is in region of Day of week.
-						if(Day == 0)
+						if(Day == 1)
 							break;
 						Day--;
 					}else{
@@ -502,8 +504,15 @@ void watch_Update(){
 			default:
 				break;
 		}
+	YLine = 9;// force the cursor to stay on 2nd line.
 	EPW_LoadPart(font8x8_basic + (char)'_', Xcol, YLine, 1, 8);// underscore the currently selected digit.
-	EPW_Print((menuTrack ? num2DMY : num2Char));
+	if(menuTrack == 0){
+		EPW_Print(num2Char);
+	}else{
+		EPW_Print(&DayNames[Day]);
+		EPW_Print("--");
+		EPW_Print(num2DMY);
+	}
 	EPW_Update();// Update display
 	}
 }
@@ -515,7 +524,7 @@ void watch_showMenu(uint8_t menum){
 	switch(menum){
 		case 0:// show current time
 			// grep time from shadow registries
-			//liteRTC_grepTime(&hour, &minute, &second);
+			// liteRTC_grepTime(&hour, &minute, &second);
 			// I don't implement the grepTime that return(?) the BCD number, so just read directly from shadow registries
 			
 			watch_readTime(num2Char);
@@ -544,9 +553,9 @@ void watch_showMenu(uint8_t menum){
 
 // Watch thingy stuffs handler.
 void watch_handler(){
-	if(readPin != 0xFF){// if any pin is triggered interrupt
+	if(readPin != 0xFF)// if any pin is triggered interrupt
 			EPW_DispOn(true);// turn display on 
-	}
+	
 	CLK_PCKENR1 |= 0x04;// Enable TIM4 clock for Screen timeout timer.
 	// start counter for screen timeout.
 	TIM4_ARR = 243; //set prescaler period for 0.5s 
@@ -588,7 +597,7 @@ void watch_handler(){
 			break;
 		}
 		
-		watch_showMenu(menuTrack);// put in while loop make it possible to update display every .5 second
+		watch_showMenu(menuTrack);// put this outside swithc case to make it possible to update display every .5 second
 	}
 	
 	// reset counter 
@@ -611,6 +620,7 @@ void watch_handler(){
 void main(){
 	GPIO_init();// GPIO Init
 	i2c_init(0x00, I2C_400K);// I2C at 400KHz
+	liteRTC_Init();// Init RTC peripheral.
 	PWR_CSR2 |= (1 << 1);// disable ADC ref voltage regulator when sleeping. (No effect sine we don't use ADC).
 	
 	__asm__("rim");// enable interrupt controller.
@@ -619,7 +629,7 @@ void main(){
 	
 	//Start the OLED display
 	EPW_start();
-	delay_ms(500);
+	delay_ms(100);
 	
 	// Splash text
 	EPW_Print("Fl3xWatch OLED\nBy TinLethax");
