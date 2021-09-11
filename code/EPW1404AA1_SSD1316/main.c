@@ -58,7 +58,7 @@
 #define EPW_SEGREMP_LH 	0xA1 // Do the reverse of 0xA0 (This will be used when define LEFT_HANDED.
 
 #define EPW_SETMUXR		0xA8 // command to set Multiplex Ratio.
-#define EPW_MUXR		0x0F // 23 + 1 Mux (?).
+#define EPW_MUXR		0x0F // 15 + 1 Mux (16 com/row strating from 0 - 15).
 
 #define EPW_SETDSOF		0xD3 // command to Display offset.
 #define EPW_DSOF		0x1F // vertical shift by COM from 38.
