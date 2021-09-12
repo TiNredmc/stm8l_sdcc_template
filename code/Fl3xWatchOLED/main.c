@@ -547,6 +547,7 @@ void watch_Update(){
 			default:
 				break;
 		}
+	readPin = 0xFF;// reset pin read state
 	YLine = 9;// force the cursor to stay on 2nd line.
 	EPW_LoadPart(font8x8_basic + (char)'_', Xcol, YLine, 1, 8);// underscore the currently selected digit.
 	if(menuTrack == 0){
@@ -618,6 +619,7 @@ void watch_handler(){
 					TimeUpdate_lock = 0;// release Time update lock.
 					watch_Update();// enter time/date update mode.
 				}
+			
 			break;
 			
 		case 0xF7:// Right button is pressed.
@@ -625,7 +627,7 @@ void watch_handler(){
 			menuTrack++;// navigate to next menu.
 			if(menuTrack > (MAX_MENU-1))
 				menuTrack = 0;
-
+			
 			break;
 			
 		case 0xFE: // Left button is pressed.
@@ -637,9 +639,10 @@ void watch_handler(){
 			break;
 			
 		default:
+			
 			break;
 		}
-		
+		readPin = 0xFF;// reset pin read state
 		watch_showMenu(menuTrack);// put this outside swithc case to make it possible to update display every .5 second
 	}
 	
