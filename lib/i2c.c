@@ -6,7 +6,7 @@
 
 void i2c_init(uint8_t devID, uint8_t SCLSpeed) { // init I2C with Own Device address (Master address) and I2C Speed 
     CLK_CKDIVR = 0x00; // No clock divider
-    CLK_PCKENR1 |= 0x04;// enable the I2C clock 
+    CLK_PCKENR1 |= 0x08;// enable the I2C clock 
     I2C1_FREQR |= F_CPU/1000000 ;// 16MHz/10^6
 	
     I2C1_CR1 &= ~0x01;// cmd disable for i2c configurating
@@ -42,7 +42,7 @@ uint8_t i2c_ChkEv(uint16_t I2C_Event)// event check, VERY CRUCIAL part, otherwis
   uint8_t flag2 = 0x00;
     flag1 = I2C1_SR1;
     flag2 = I2C1_SR3;
-    lastevent = ((uint16_t)((uint16_t)flag2 << (uint16_t)8) | (uint16_t)flag1);
+    lastevent = ((uint16_t)(flag2 << 8) | (uint16_t)flag1);
   /* Check whether the last event is equal to I2C_EVENT */
   /* Return status */
   return (((uint16_t)lastevent & (uint16_t)I2C_Event) == (uint16_t)I2C_Event) ;
