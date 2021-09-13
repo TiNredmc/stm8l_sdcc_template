@@ -26,7 +26,7 @@
 
 #define EPW_FB_HALFSIZE 128 // define the memory size used for the Send buffer.
 
-#define EPW_ADDR 		0x78 // 7bit i2c address already.
+#define EPW_ADDR 		0x3C // 7bit i2c address already.
 
 #define EPW_CMD_MODE 	0x80 // First byte to send before sending any command-related byte.
 
@@ -106,7 +106,7 @@ void GPIO_init(){
 // I2C send single CMD byte 
 void EPW_sendCMD(uint8_t packet){
 	i2c_start();// generate start condition.
-	
+		
 	i2c_write_addr(EPW_ADDR);// call slave device for write.
 		i2c_write(EPW_CMD_MODE);// Indicator that next byte is command
 		i2c_write(packet);// write data to EPW14040AA1.
