@@ -28,7 +28,7 @@
 
 #define EPW_FB_HALFSIZE 128 // define the memory size used for the Send buffer.
 
-#define EPW_ADDR 		0x78 // 7bit i2c address already.
+#define EPW_ADDR 		0x3c // 7bit i2c address already.
 
 #define EPW_CMD_MODE 	0x80 // First byte to send before sending any command-related byte.
 
