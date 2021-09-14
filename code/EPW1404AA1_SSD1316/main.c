@@ -15,13 +15,14 @@
 // 9.9 in 10 people wears watch on left hand. I'm the 0.1 who wear on right hand.
 //#define LEFT_HANDED
 
+
 // Define pin to use 
 // RSTB
 #define EPW_RSTB		4// PC4
 // 10Volt boost enable pin of TPS63060 (Dev version) or LTC3459 (Watch version).
 #define EPW_VBOOST		5// PC5
 
-// Necessary Definitions of EPW14040AA1
+// Necessary Definitions of EPW1404AA1
 #define EPW_FB_SIZE 	256 	// define the memory size used for Frame Buffer (128x2 bytes = 256 bytes).
 
 #define EPW_FB_HALFSIZE 128 // define the memory size used for the Send buffer.
@@ -38,7 +39,7 @@
 /* init commands sequence*/
 
 #define EPW_SETCONT		0x81 // command to set contrast.
-#define EPW_CONT		0x48 // contras value that need to be set. Might tinkering with this later.
+#define EPW_CONT		0xFF // contras value that need to be set. Might tinkering with this later.
 
 // DON'T CHANGE THE PARAMETER, THESE PARAMS ARE FIXED BY MANUFACTURER !
 #define EPW_SETVCOM		0xAD // command to set VCOMH.
@@ -58,7 +59,7 @@
 #define EPW_SEGREMP_LH 	0xA1 // Do the reverse of 0xA0 (This will be used when define LEFT_HANDED.
 
 #define EPW_SETMUXR		0xA8 // command to set Multiplex Ratio.
-#define EPW_MUXR		0x0F // 15 + 1 Mux (16 com/row strating from 0 - 15).
+#define EPW_MUXR		0x0F // 16 - 1 Mux (16 com/row strating from 0 - 15).
 
 #define EPW_SETDSOF		0xD3 // command to Display offset.
 #define EPW_DSOF		0x1F // vertical shift by COM from 38.
@@ -69,14 +70,9 @@
 #define EPW_PHC			0x12 // Alternative SEG pin configuration and Disable SEG left/right remap.
 
 #define EPW_SETPAM		0x20 // command to set memory addressing mode.
-#define EPW_PAM			0x02 // Page Addressing Mode (default)
+#define EPW_PAM			0x00 // Horizontal addressing mode (easier to send data).
+
 /* end init sequence commands */
-
-// Memory related commands for Page update.
-#define EPW_PGSEL_0		0xB0 // select Page 0 (pixel row 0 to 7).
-
-#define EPW_PGSEL_1		0xB1 // select Page 1 (pixel row 8 to 15).
-
 
 /* Graphic related stuffs */
 
@@ -85,7 +81,7 @@
 uint8_t FB0[EPW_FB_SIZE]={0};// standard horizontal byte format Frame buffer
 
 // 16 column bytes and 8 rows (For updating each Memory Page (0:1)).
-static uint8_t PG[EPW_FB_HALFSIZE];// single page vertical byte format for data sending.
+static uint8_t PG;// byte holding the vertical byte format for data sending.
 
 //These Vars required for print function
 static uint8_t YLine = 1;
@@ -109,7 +105,7 @@ void EPW_sendCMD(uint8_t packet){
 		
 	i2c_write_addr(EPW_ADDR);// call slave device for write.
 		i2c_write(EPW_CMD_MODE);// Indicator that next byte is command
-		i2c_write(packet);// write data to EPW14040AA1.
+		i2c_write(packet);// write data to EPW1404AA1.
 	
 	i2c_stop();// generate stop condition.
 	
@@ -117,28 +113,27 @@ void EPW_sendCMD(uint8_t packet){
 
 // I2C send double CMD byte
 void EPW_sendCMD2(uint8_t pac1, uint8_t pac2){
-	EPW_sendCMD(pac1);// write CMD to EPW14040AA1.
-	EPW_sendCMD(pac2);// write Param of above CMD to EPW14040AA1.
+	EPW_sendCMD(pac1);// write CMD to EPW1404AA1.
+	EPW_sendCMD(pac2);// write Param of above CMD to EPW1404AA1.
 }
 
 // Initialize the Display
 void EPW_start(){
+	PC_ODR &= ~(1 << EPW_RSTB);// reset the display
+	delay_ms(1);
 	PC_ODR |= (1 << EPW_RSTB);// set RSTB high.
 	delay_us(10);// wait a little bit.
 	PC_ODR |= (1 << EPW_VBOOST);// turn the TPS63060 on (EN pin default is pull high by resistor, remove that resistor).
+
+	EPW_sendCMD(EPW_Sleep);// Turn Display off.
 	
-	delay_ms(1);
 	EPW_sendCMD2(EPW_SETCONT, EPW_CONT);// set contrast. 
 	EPW_sendCMD2(EPW_SETVCOM, EPW_VCOM);// select VCOMH/IREF.
 	EPW_sendCMD2(EPW_SETOSC,	EPW_OSC);// set Clock Divide Raton and Oscillator Freq .
 	EPW_sendCMD2(EPW_SETPCW, EPW_PCW);// set Precharge Width.
 	EPW_sendCMD2(EPW_SETVCDE, EPW_VCDE);// set VCOMH Deselect Level.
 	
-#ifdef LEFT_HANDED
-	EPW_sendCMD(EPW_SEGREMP_LH);// swap the column when put this watch on left hand
-#else
-	EPW_sendCMD(EPW_SEGREMP_RH);// Don't swap the column because we're using right handed mode.
-#endif 
+
 	EPW_sendCMD2(EPW_SETMUXR, EPW_MUXR);// set Mux Ratio.
 	EPW_sendCMD2(EPW_SETDSOF, EPW_DSOF);// set Display offset.
 #ifndef LEFT_HANDED
@@ -146,6 +141,12 @@ void EPW_start(){
 #endif 
 	EPW_sendCMD2(EPW_SETPHC,  EPW_PHC);// set Pin Hardware configuration for setting segment order
 	EPW_sendCMD2(EPW_SETPAM,	EPW_PAM);// set Memory addressing mode to Page address (2 pages, 8 bit width each).
+#ifdef LEFT_HANDED
+	EPW_sendCMD(EPW_SEGREMP_LH);// swap the column when put this watch on left hand
+#else
+	EPW_sendCMD(EPW_SEGREMP_RH);// Don't swap the column because we're using right handed mode.
+#endif 
+
 	
 	// Turn display on.
 	EPW_sendCMD(EPW_Wake);
@@ -165,25 +166,33 @@ void EPW_DispOn(bool on){
 // Update Display  
 void EPW_Update(){
 	
-for (uint8_t p=0; p < 2; p++){// Do this twice for 2 mem pages.
-	// Byte Flip 90 degree
-	for (uint8_t FBOff = 0; FBOff < 128; FBOff ++){// 128 columns (for each verical byte PB[]).
-			for (uint8_t i=0; i < 8; i++){// Single bit of FB0 every 16n byte is rotated to vertical byte 
-				PG[FBOff+1] |= ( ( FB0[(16*i) /*Row select*/ +(FBOff/8) /*Horizontal offset, move to next FB0 byte every 8 column*/ + (p ? EPW_FB_HALFSIZE : 0) /* Page changing */ ] && (1 << (FBOff%8)) ) << i);
-			}
-	}
-				// select Memory page before updating.
-	EPW_sendCMD(p ? EPW_PGSEL_1 : EPW_PGSEL_0);// Select whether to send to Page number 0 or 1.
-	EPW_sendCMD2(0x00, 0x10);// Start to segment 0 (by setting the low, high column address).
+	EPW_sendCMD(0x21);// set column offset and end 
+	EPW_sendCMD(0);// start at column 0
+	EPW_sendCMD(127);// to column 127
+	
+	EPW_sendCMD(0x22);// set start and stop page
+	EPW_sendCMD(0);// start at page 0
+	EPW_sendCMD(1);// and end at page 1
+	
 	
 	i2c_start();// generate start condition.
 	
 	i2c_write_addr(EPW_ADDR);// call slave device for write.
 		i2c_write(EPW_DAT_MODE);// send 0x40 to indicate that this is Display data
-		i2c_writePtrAuto(PG);// sequential write to Display, 128 byte data of that page
 		
+	for (uint16_t FBOff = 0; FBOff < 256; FBOff ++){// 128 columns (for each verical byte PB[]).
+			for (uint8_t i=0; i < 8; i++){// Single bit of FB0 every 16n byte is rotated to vertical byte 
+				if(FB0[(16*i) + ( (FBOff%128) / 8) + ((FBOff / EPW_FB_HALFSIZE)*EPW_FB_HALFSIZE)] & (1 << (FBOff%8)))
+					PG |= (1 << i);
+				else
+					PG &= ~(1 << i);
+			}
+
+			i2c_write(PG);// Write 1 vertical byte to display for 128 times.
+	}
+
 	i2c_stop();// generate stop condition.
-}
+
 }
 
 /* Graphic stuffs */
@@ -223,7 +232,7 @@ void EPW_LoadPart(uint8_t* BMP, uint8_t Xcord, uint8_t Ycord, uint8_t bmpW, uint
 
 		// turn W and H into absolute offset number for Bitmap image
 		//WHoff = loop * bmpW;
-		memcpy(FB0 + ((Ycord + loop) * 16), BMP + (loop * bmpW), bmpW);
+		memcpy(FB0 + ((Ycord + loop) * 16) + Xcord, BMP + (loop * bmpW), bmpW);
 	}
 
 }
@@ -232,26 +241,25 @@ void EPW_LoadPart(uint8_t* BMP, uint8_t Xcord, uint8_t Ycord, uint8_t bmpW, uint
 //Print 8x8 Text on screen
 void EPW_Print(char *txtBuf){
 
-uint16_t chOff = 0;
+//uint16_t chOff = 0;
 
 while(*txtBuf){
-	// In case of reached 50 chars or newline detected , Do the newline
+	// In case of reached 16 chars or newline detected , Do the newline
 	if ((Xcol > 16) || *txtBuf == 0x0A){
 		Xcol = 1;// Move cursor to most left
 		YLine += 8;// enter new line
-		if(YLine > 9)// if new line is out of display bound 
-			YLine = 1;// roll it back to the top.
 		txtBuf++;// move to next char
 	}
 
 	// Avoid printing Newline
 	if (*txtBuf != 0x0A){
-	chOff = (*txtBuf - 0x20) * 8;// calculate char offset (fist 8 pixel of character)
-	EPW_LoadPart(font8x8_basic + chOff, Xcol, YLine, 1, 8);// Align the char with the 8n pixels
+	//chOff = (*txtBuf - 0x20) * 8;// calculate char offset (fist 8 pixel of character)
+	EPW_LoadPart(font8x8_basic + ((*txtBuf - 0x20) * 8), Xcol, YLine, 1, 8);// Align the char with the 8n pixels
 
 	txtBuf++;// move to next char
 	Xcol++;// move cursor to next column
 	}
+	
   }
 }
 
@@ -264,15 +272,18 @@ void main(){
 	
 	//Start the OLED display
 	EPW_start();
-	delay_ms(500);
-	
-	// Demo 0
-	EPW_Print("TinLethax !\n");
-	EPW_Print("0123456789ABCDEF");
-	EPW_Update();
-	
-	while(1){
 
+
+	while(1){
+	EPW_Clear();
+	EPW_Print("EPW1404AA1 OLED");
+	EPW_Print("\nBy TinLethax");
+	EPW_Update();
+	delay_ms(1000);
+	EPW_Clear();
+	EPW_Fill();
+	EPW_Update();
+	delay_ms(1000);
 	}// While loop
   
 }// main 
