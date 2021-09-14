@@ -40,7 +40,7 @@
 /* init commands sequence*/
 
 #define EPW_SETCONT		0x81 // command to set contrast.
-#define EPW_CONT		0x48 // contras value that need to be set. Might tinkering with this later.
+#define EPW_CONT		0xFF // contras value that need to be set. Set to Max.
 
 // DON'T CHANGE THE PARAMETER, THESE PARAMS ARE FIXED BY MANUFACTURER !
 #define EPW_SETVCOM		0xAD // command to set VCOMH.
@@ -71,14 +71,9 @@
 #define EPW_PHC			0x12 // Alternative SEG pin configuration and Disable SEG left/right remap.
 
 #define EPW_SETPAM		0x20 // command to set memory addressing mode.
-#define EPW_PAM			0x02 // Page Addressing Mode (default)
+#define EPW_PAM			0x00 // Horizontal addressing mode (easier to send data).
+
 /* end init sequence commands */
-
-// Memory related commands for Page update.
-#define EPW_PGSEL_0		0xB0 // select Page 0 (pixel row 0 to 7).
-
-#define EPW_PGSEL_1		0xB1 // select Page 1 (pixel row 8 to 15).
-
 
 /* Graphic related stuffs */
 
@@ -87,7 +82,7 @@
 uint8_t FB0[EPW_FB_SIZE]={0};// standard horizontal byte format Frame buffer
 
 // 16 column bytes and 8 rows (For updating each Memory Page (0:1)).
-static uint8_t PG[EPW_FB_HALFSIZE];// single page vertical byte format for data sending.
+static uint8_t PG;// single page vertical byte format for data sending.
 
 //These Vars required for print function
 static uint8_t YLine = 1;
@@ -105,7 +100,7 @@ uint8_t TimeUpdate_lock = 0;
 uint8_t menuTrack = 0;
 #define MAX_MENU	2 // maximum menu pages
 
-#define SCREEN_TIMEOUT	5*2 // screen timeout 5 secs. since we use .5s counter (1 second counter is counting up 2 times).
+#define SCREEN_TIMEOUT	5 // screen timeout 5 secs. since we use .5s counter (1 second counter is counting up 2 times).
 volatile uint8_t countdown = 0;// screen timout keeper.
 
 /* Date and Time stuffs */
@@ -117,7 +112,7 @@ uint8_t num2Char[8]={0,0,':',0,0,':',0,0};// store the time in char format "HH:M
 // DMY keeping, read from RTC shadow registries.
 uint8_t Day, Date, Month, Year;
 // convert day of week number to day name.
-const static uint8_t DayNames[7]={"MON", "TUE", "WEN", "THU", "FRI", "SAT", "SUN"};
+const static uint8_t DayNames[7]={" MON", " TUE", " WEN", " THU", " FRI", " SAT", " SUN"};
 uint8_t num2DMY[10]={0,0, 0x2f, 0,0, 0x2f, '2','0', 0, 0};// store the date, month and year in cahr format "DD/MM/20YY"
 
 // Look up tables for Cursor selection
@@ -149,7 +144,7 @@ void GPIO_init(){
 	//EXTI_CR2 &= ~0x03;// set interrupt to detect falling and low (Port4).
 	
 	// We need to do the EXTI setup in sequence.
-	EXTI_CR3 &= ~0x03;// set interrupt sensitivity to detect falling and low (PortB).
+	EXTI_CR3 = 0x00;// set interrupt sensitivity to detect falling and low (PortB).
 	EXTI_CONF1 |= 0x03;// Enable Port B interrupt source.
 	EXTI_CONF2 &= (uint8_t)~0x20;// Port B instead of Port G is used for interrupt generation.
 }
@@ -228,35 +223,36 @@ void EPW_DispOn(bool on){
 // Update Display  
 void EPW_Update(){
 	
-for (uint8_t p=0; p < 2; p++){// Do this twice for 2 mem pages.
-	// Byte Flip 90 degree
-	for (uint8_t FBOff = 0; FBOff < 128; FBOff ++){// 128 columns (for each verical byte PB[]).
-			for (uint8_t i=0; i < 8; i++){// Single bit of FB0 every 16n byte is rotated to vertical byte 
-				PG[FBOff+1] |= ( ( FB0[(16*i) /*Row select*/ +(FBOff/8) /*Horizontal offset, move to next FB0 byte every 8 column*/ + (p ? EPW_FB_HALFSIZE : 0) /* Page changing */ ] && (1 << (FBOff%8)) ) << i);
-			}
-	}
-				// select Memory page before updating.
-	EPW_sendCMD(p ? EPW_PGSEL_1 : EPW_PGSEL_0);// Select whether to send to Page number 0 or 1.
-	EPW_sendCMD2(0x00, 0x10);// Start to segment 0 (by setting the low, high column address).
+	EPW_sendCMD(0x21);// set column offset and end 
+	EPW_sendCMD(0);// start at column 0
+	EPW_sendCMD(127);// to column 127
+	
+	EPW_sendCMD(0x22);// set start and stop page
+	EPW_sendCMD(0);// start at page 0
+	EPW_sendCMD(1);// and end at page 1
+	
 	
 	i2c_start();// generate start condition.
 	
 	i2c_write_addr(EPW_ADDR);// call slave device for write.
 		i2c_write(EPW_DAT_MODE);// send 0x40 to indicate that this is Display data
-		i2c_writePtrAuto(PG);// sequential write to Display, 128 byte data of that page
+	
+	for (uint16_t FBOff = 0; FBOff < 256; FBOff ++){// 128 columns, 2 pages (for each verical byte PB[]).
+			for (uint8_t i=0; i < 8; i++){// Single bit of FB0 every 16n byte is rotated to vertical byte 
+				if(FB0[(16*i) + ( (FBOff%128) / 8) + ((FBOff / EPW_FB_HALFSIZE)*EPW_FB_HALFSIZE)] & (1 << (FBOff%8)))
+					PG |= (1 << i);
+				else
+					PG &= ~(1 << i);
+			}
+
+			i2c_write(PG);// Write 1 vertical byte to display for 128 times.
+	}
 		
 	i2c_stop();// generate stop condition.
-}
+
 }
 
 /* Graphic stuffs */
-
-// Load Graphic with same size as Frame Buffer into FB0
-/*
-void EPW_LoadFull(uint8_t *BMP){
-	memcpy(FB0, BMP, EPW_FB_SIZE);
-}*/
-
 // Clear all pixels of Frame Buffer 
 void EPW_Clear(){
 	Xcol = 1;
@@ -264,11 +260,6 @@ void EPW_Clear(){
 	memset(FB0, 0, EPW_FB_SIZE);
 }
 
-// Fill entire Frame Buffer with 1
-/*
-void EPW_Fill(){
-	memset(FB0, 0xFF, EPW_FB_SIZE);
-}*/
 
 // Buffer update (with X,Y Coordinate and image WxH) X,Y Coordinate start at (1,1) to (16,128)
 //
@@ -288,30 +279,28 @@ void EPW_LoadPart(uint8_t* BMP, uint8_t Xcord, uint8_t Ycord, uint8_t bmpW, uint
 
 		// turn W and H into absolute offset number for Bitmap image
 		//WHoff = loop * bmpW;
-		fast_memcpy(FB0 + ((Ycord + loop) * 16), BMP + (loop * bmpW), bmpW);
+		fast_memcpy(FB0 + ((Ycord + loop) * 16) + Xcord, BMP + (loop * bmpW), bmpW);
 	}
 
 }
 
 //Print 8x8 Text on screen
-void EPW_Print(char *txtBuf){
+void EPW_Print(char *txtBuf,uint8_t len){
 
-uint16_t chOff = 0;
+//uint16_t chOff = 0;
 
-while(*txtBuf){
-	// In case of reached 50 chars or newline detected , Do the newline
+while(len--){
+	// In case of reached 16 chars or newline detected , Do the newline
 	if ((Xcol > 16) || *txtBuf == 0x0A){
 		Xcol = 1;// Move cursor to most left
 		YLine += 8;// enter new line
-		if(YLine > 9)// if new line is out of display bound 
-			YLine = 1;// roll it back to the top.
 		txtBuf++;// move to next char
 	}
 
 	// Avoid printing Newline
 	if (*txtBuf != 0x0A){
-	chOff = (*txtBuf - 0x20) * 8;// calculate char offset (fist 8 pixel of character)
-	EPW_LoadPart(font8x8_basic + chOff, Xcol, YLine, 1, 8);// Align the char with the 8n pixels
+	//chOff = (*txtBuf - 0x20) * 8;// calculate char offset (fist 8 pixel of character)
+	EPW_LoadPart(font8x8_basic + ((*txtBuf - 0x20) * 8), Xcol, YLine, 1, 8);// Align the char with the 8n pixels
 
 	txtBuf++;// move to next char
 	Xcol++;// move cursor to next column
@@ -327,11 +316,11 @@ while(*txtBuf){
 
 // Interrupt Handler for PortB smd joy stick switches.
 void joystick_irq(void) __interrupt(6){
+	__asm__("nop");
 	readPin = PB_IDR;// quickly read the GPIO for further mode select.
-	
+
 	//reset_countdown_timer
-	TIM4_SR = (uint8_t)(~(0x01));// reset sleep countdown timer when pressing button.
-	countdown = TIM4_CNTR;// recount timer.
+	countdown = RTC_TR1;// recount timer.
 	
 	EXTI_SR2 = 0x01;// clear interrupt pending bit of PortB interrupt.
 }
@@ -343,14 +332,14 @@ void watch_readTime(uint8_t *timebuf){
 			hour   = RTC_TR3 & 0x3F;
 			
 			// convert BCD  to char 
-			timebuf[0] = (second >> 4) + 0x30;// convert the tens digit to char 
-			timebuf[1] = (second & 0x0F) + 0x30;// convert the ones digit to char 
+			timebuf[6] = (second >> 4) + 0x30;// convert the tens digit to char 
+			timebuf[7] = (second & 0x0F) + 0x30;// convert the ones digit to char 
 			
 			timebuf[3] = (minute >> 4) + 0x30;// convert the tens digit to char 
 			timebuf[4] = (minute & 0x0F) + 0x30;// convert the ones digit to char 
 			
-			timebuf[6] = (hour >> 4) + 0x30;// convert the tens digit to char 
-			timebuf[7] = (hour & 0x0F) + 0x30;// convert the ones digit to char 
+			timebuf[0] = (hour >> 4) + 0x30;// convert the tens digit to char 
+			timebuf[1] = (hour & 0x0F) + 0x30;// convert the ones digit to char 
 }
 
 // Read Day of week, Day, Month and last 2 digits of Year of the time shadow registries.
@@ -375,15 +364,17 @@ void watch_readDate(uint8_t *datebuf){
 
 // Update Time and Date.
 void watch_Update(){
+	uint8_t prevXcol = 1;// store previous cursor Xcol position and restore it after EPW_Print.
+	EPW_Clear();
 	
 	if(menuTrack == 0)
-		EPW_Print("Adjust Time:\n");// Menu number 0 : Time.
-	else 
-		EPW_Print("Adjust Date:\n");// Menu number 1 : Date.
+		EPW_Print("Adjust Time:    ", 16);// Menu number 0 : Time.
+	else
+		EPW_Print("Adjust Date:    ", 16);// Menu number 1 : Date.
+
+	countdown = RTC_TR1;// first lap
 	
-	countdown = TIM4_CNTR;// first lap.
-	
-	while ((TIM4_CNTR - countdown) < SCREEN_TIMEOUT){
+	while ((RTC_TR1 - countdown) < SCREEN_TIMEOUT){
 		switch(readPin){
 			case 0xF7: // right button is pressed.
 				// move cursor forward.
@@ -533,7 +524,7 @@ void watch_Update(){
 				}
 				break;
 					
-			case 0xFC: // center button is pressed
+			case 0xFD: // center button is pressed
 					// save Time/Date setting.
 				if(menuTrack == 0)
 					liteRTC_SetHMS((num2Char[0]*10)+num2Char[1], (num2Char[3]*10)+num2Char[4], (num2Char[6]*10)+num2Char[7]);
@@ -548,15 +539,17 @@ void watch_Update(){
 				break;
 		}
 	readPin = 0xFF;// reset pin read state
-	YLine = 9;// force the cursor to stay on 2nd line.
-	EPW_LoadPart(font8x8_basic + (char)'_', Xcol, YLine, 1, 8);// underscore the currently selected digit.
+	YLine = 9;// Force the Cursor to stay on 2nd line,
+	prevXcol = Xcol;// Backup
+	EPW_LoadPart(font8x8_basic + (char)'_', Xcol, 9, 1, 8);// underscore the currently selected digit.
 	if(menuTrack == 0){
-		EPW_Print(num2Char);
+		EPW_Print(num2Char, 8);
 	}else{
-		EPW_Print(&DayNames[Day]);
-		EPW_Print("--");
-		EPW_Print(num2DMY);
+		EPW_Print(&DayNames[Day], 3);
+		EPW_Print("--", 2);
+		EPW_Print(num2DMY, 10);
 	}
+	Xcol = prevXcol;// Restore.
 	EPW_Update();// Update display
 	}
 }
@@ -564,30 +557,29 @@ void watch_Update(){
 
 // Show each menu on screen.
 void watch_showMenu(uint8_t menum){
-
+	EPW_Clear();
+	
 	switch(menum){
 		case 0:// show current time
 			// grep time from shadow registries
 			// liteRTC_grepTime(&hour, &minute, &second);
 			// I don't implement the grepTime that return(?) the BCD number, so just read directly from shadow registries
-			
 			watch_readTime(num2Char);
 			
 			// Print to Display and update
-			EPW_Print("Current Time:\n");
-			EPW_Print(num2Char);
+			EPW_Print("Current Time:        ", 21);
+			EPW_Print(num2Char, 8);
 			break;
 		case 1:// show Day of week, Date Month and year.
-		
+			
 			//liteRTC_grepDate(&Day, &Date, &Month, &Year);
 			// I don't implement the grepTime that return(?) the BCD number, so just read directly from shadow registries
-			
 			watch_readDate(num2DMY);
 			
-			EPW_Print("Current Date:\n");
-			EPW_Print(&DayNames[Day]);
-			EPW_Print("--");
-			EPW_Print(num2DMY);
+			EPW_Print("Current Date:", 13);
+			EPW_Print(&DayNames[Day], 3);
+			EPW_Print("--", 2);
+			EPW_Print(num2DMY, 10);
 			break;
 		default:
 			break;
@@ -597,23 +589,16 @@ void watch_showMenu(uint8_t menum){
 
 // Watch thingy stuffs handler.
 void watch_handler(){
-	if(readPin != 0xFF)// if any pin is triggered interrupt
+	//if(readPin != 0xFF)// if any pin is triggered interrupt
 			EPW_DispOn(true);// turn display on 
-	
-	CLK_PCKENR1 |= 0x04;// Enable TIM4 clock for Screen timeout timer.
+	watch_showMenu(menuTrack);
 	// start counter for screen timeout.
-	TIM4_ARR = 243; // set prescaler period for 0.5s 
-	TIM4_PSCR = 0x0F;// set prescaler, divide sysclock to 488Hz for making 0.5s counter 
-	TIM4_EGR = 0x01;// event source update 
-	// start timer 
-	TIM4_CR1 |= 0x01;// the time at the starting point
+	countdown = RTC_TR1;// snapshot of start time.
 	
-	countdown = TIM4_CNTR;// snapshot of start time.
-	
-	while ((TIM4_CNTR - countdown) < SCREEN_TIMEOUT){// find delta for how long does this loop currenty take.
+	while ((RTC_TR1 - countdown) < SCREEN_TIMEOUT){// find delta for how long does this loop currenty take.
 		switch(readPin){
 			
-		case 0xFC:// Center button is pressed.
+		case 0xFD:// Center button is pressed. PB1
 			TimeUpdate_lock +=1;
 				if(TimeUpdate_lock == 2){// If pressed 2 times.
 					TimeUpdate_lock = 0;// release Time update lock.
@@ -622,7 +607,7 @@ void watch_handler(){
 			
 			break;
 			
-		case 0xF7:// Right button is pressed.
+		case 0xF7:// Right button is pressed. PB3
 			TimeUpdate_lock = 0;// release Tim update lock, make sure that pressing center accidentally won't trigger Tim Update.
 			menuTrack++;// navigate to next menu.
 			if(menuTrack > (MAX_MENU-1))
@@ -630,16 +615,15 @@ void watch_handler(){
 			
 			break;
 			
-		case 0xFE: // Left button is pressed.
+		case 0xFE: // Left button is pressed. PB0
 			TimeUpdate_lock = 0;// release Tim update lock, make sure that pressing center accidentally wont trigger Tim Update
+			if(menuTrack == 0)
+				break;
 			menuTrack--;// navigate to previous menu.
-			if(menuTrack > (MAX_MENU-1))// in case of roll over, reset to 0 
-				menuTrack = 0;
 			
 			break;
 			
 		default:
-			
 			break;
 		}
 		readPin = 0xFF;// reset pin read state
@@ -647,12 +631,11 @@ void watch_handler(){
 	}
 	
 	// reset counter 
-	TIM4_SR = (uint8_t)(~(0x01));
-	// Turn TIM4 off
-	TIM4_CR1 &= ~0x01;    
-	CLK_PCKENR1 &= (uint8_t)(~0x04);// Disable TIM4 clock before we go to sleep.
+	countdown = 0;
 	
 	// enter sleep mode.
+	EPW_Clear();// claer Buffer before going to sleep.
+	EXTI_SR2 = 0x01;// clear interrupt pending bit of PortB interrupt.
 	EPW_DispOn(false);// turn display of via command then turn of the Boost IC.
 	__asm__("halt");// halt CPU, Now in active halt mode. Only RTC and ITC are running.
 }
@@ -677,14 +660,8 @@ void main(){
 	EPW_start();
 	delay_ms(100);
 	
-	// Splash text
-	EPW_Print("Fl3xWatch OLED\nBy TinLethax");
-	EPW_Update();
-	delay_ms(1000);
-	watch_showMenu(0);// Show time on screen
-	
 	while(1){
-		watch_handler();
+		watch_handler();// watch handler, including menu select, Enter update mode, and put to sleep.
 	}// While loop
   
 }// main 
