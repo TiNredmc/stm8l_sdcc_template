@@ -81,7 +81,6 @@
 // 16 column bytes and 16 rows 
 uint8_t FB0[EPW_FB_SIZE]={0};// standard horizontal byte format Frame buffer
 
-// 16 column bytes and 8 rows (For updating each Memory Page (0:1)).
 static uint8_t PG;// single page vertical byte format for data sending.
 
 //These Vars required for print function
@@ -92,6 +91,7 @@ static uint8_t Xcol = 1;
 
 // store PB_IDR to this variable to further detect which button is pushed/pressed. 
 volatile uint8_t readPin = 0;
+uint8_t prevReadPIn = 0;
 
 // press center button to enter time update mode.
 uint8_t TimeUpdate_lock = 0;
@@ -144,7 +144,7 @@ void GPIO_init(){
 	//EXTI_CR2 &= ~0x03;// set interrupt to detect falling and low (Port4).
 	
 	// We need to do the EXTI setup in sequence.
-	EXTI_CR3 = 0x00;// set interrupt sensitivity to detect falling and low (PortB).
+	EXTI_CR3 = 0x02;// set interrupt sensitivity to detect falling and low (PortB).
 	EXTI_CONF1 |= 0x03;// Enable Port B interrupt source.
 	EXTI_CONF2 &= (uint8_t)~0x20;// Port B instead of Port G is used for interrupt generation.
 }
@@ -282,6 +282,19 @@ void EPW_LoadPart(uint8_t* BMP, uint8_t Xcord, uint8_t Ycord, uint8_t bmpW, uint
 		fast_memcpy(FB0 + ((Ycord + loop) * 16) + Xcord, BMP + (loop * bmpW), bmpW);
 	}
 
+}
+
+
+// Same as EPW_LoadPart(), but will merge the input bitmap with current pixels data on Frame Buffer.
+void EPW_LoadPartMerge(uint8_t* BMP, uint8_t Xcord, uint8_t Ycord, uint8_t bmpW, uint8_t bmpH){
+	Xcord--;
+	Ycord--;
+	
+	//Counting from Y origin point to bmpH using for loop
+	for(uint8_t loop = 0; loop < bmpH; loop++){
+		for(uint8_t width = 0; width < bmpW; width++)
+			FB0[((Ycord + loop) * 16) + Xcord  +width]	|= *(BMP + (loop * bmpW) + width);
+	}
 }
 
 //Print 8x8 Text on screen
@@ -541,7 +554,7 @@ void watch_Update(){
 	readPin = 0xFF;// reset pin read state
 	YLine = 9;// Force the Cursor to stay on 2nd line,
 	prevXcol = Xcol;// Backup
-	EPW_LoadPart(font8x8_basic + (char)'_', Xcol, 9, 1, 8);// underscore the currently selected digit.
+	EPW_LoadPartMerge(font8x8_basic + 0x3F, Xcol, 9, 1, 8);// underscore the currently selected digit.
 	if(menuTrack == 0){
 		EPW_Print(num2Char, 8);
 	}else{
@@ -617,10 +630,12 @@ void watch_handler(){
 			
 		case 0xFE: // Left button is pressed. PB0
 			TimeUpdate_lock = 0;// release Tim update lock, make sure that pressing center accidentally wont trigger Tim Update
-			if(menuTrack == 0)
+			if(menuTrack == 0){// if already on the first menu 
+				menuTrack = MAX_MENU - 1;// roll over to the last menu page
 				break;
+			}
 			menuTrack--;// navigate to previous menu.
-			
+
 			break;
 			
 		default:
