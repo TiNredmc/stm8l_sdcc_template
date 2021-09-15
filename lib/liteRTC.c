@@ -74,14 +74,13 @@ CLK_PCKENR2 |= (1 << 2);// enable rtc clock
 	RTC_WPR = 0xFF; 
 }
 
-/* Parameter descriptions
+/* Parameter descriptions (In BCD format).
  * SetDay : Day of week, Starting with Monday as 0x01 and so on, MAx is 0x07 (Sunday)
  * SetDate : Date of that day. 1 to 31 (mind the leap year on Feb too, This one actually manage by calendar itself unless you update your own)
  * SetMonth : Starting from January (0x01) to December (0x12) 
  * SetYear : starting from 2000 (0) to 2099 (99) 
  */
-void liteRTC_SetDMY(uint8_t SetDay,uint8_t SetDate, uint8_t SetMonth, uint8_t SetYear){// Set Date Month and Year (Year number 1 is Jan and Year nuber 12 is Dec : Very simple All human can do it ;D)
-
+void liteRTC_SetDMYBCD(uint8_t SetDay,uint8_t SetDate, uint8_t SetMonth, uint8_t SetYear){// Set Date Month and Year (Year number 1 is Jan and Year nuber 12 is Dec : Very simple All human can do it ;D)
 	//unlock the writing protection
 	RTC_WPR = 0xCA;
 	RTC_WPR = 0x53;
@@ -104,11 +103,11 @@ void liteRTC_SetDMY(uint8_t SetDay,uint8_t SetDate, uint8_t SetMonth, uint8_t Se
 	(void)(RTC_TR1);
 
 	//Set Date
-	RTC_DR1 = ByteToBcd2(SetDate);
+	RTC_DR1 = SetDate;
 	//Set Month
-	RTC_DR2 = ByteToBcd2(SetMonth | (uint8_t)(SetDay << 5));
+	RTC_DR2 = SetMonth | (uint8_t)(SetDay << 5);
 	//Set Year
-	RTC_DR3 = ByteToBcd2(SetYear);
+	RTC_DR3 = SetYear;
 
 	//exit init mode
 	RTC_ISR1 &= ~(1 << 7);
@@ -116,12 +115,23 @@ void liteRTC_SetDMY(uint8_t SetDay,uint8_t SetDate, uint8_t SetMonth, uint8_t Se
 	//lock write protection
 	RTC_WPR = 0xFF; 
 }
+
 /* Parameter descriptions
+ * SetDay : Day of week, Starting with Monday as 0x01 and so on, MAx is 0x07 (Sunday)
+ * SetDate : Date of that day. 1 to 31 (mind the leap year on Feb too, This one actually manage by calendar itself unless you update your own)
+ * SetMonth : Starting from January (0x01) to December (0x12) 
+ * SetYear : starting from 2000 (0) to 2099 (99) 
+ */
+void liteRTC_SetDMY(uint8_t SetDay,uint8_t SetDate, uint8_t SetMonth, uint8_t SetYear){// Set Date Month and Year (Year number 1 is Jan and Year nuber 12 is Dec : Very simple All human can do it ;D)
+	liteRTC_SetDMYBCD(ByteToBcd2(SetDay), ByteToBcd2(SetDate), ByteToBcd2(SetMonth), ByteToBcd2(SetYear));
+}
+
+/* Parameter descriptions (In BCD format).
  * SetHour : Set Hour (0-23). This code is using 24 hour format
  * SetMinute : Set Minute (0-59)
  * SetSecond : Set Second (0-59)
  */
-void liteRTC_SetHMS(uint8_t SetHour, uint8_t SetMinute, uint8_t SetSecond){// Set the Hour (24Hrs format), Minute, Second
+void liteRTC_SetHMSBCD(uint8_t SetHour, uint8_t SetMinute, uint8_t SetSecond){// Set the Hour (24Hrs format), Minute, Second
 	//unlock the writing protection
 	RTC_WPR = 0xCA;
 	RTC_WPR = 0x53;
@@ -142,11 +152,11 @@ void liteRTC_SetHMS(uint8_t SetHour, uint8_t SetMinute, uint8_t SetSecond){// Se
   }
 
 	//Set Second
-	RTC_TR1 = (uint8_t)ByteToBcd2(SetSecond);
+	RTC_TR1 = SetSecond;
 	//Set Minute 
-	RTC_TR2 = (uint8_t)ByteToBcd2(SetMinute);
+	RTC_TR2 = SetMinute;
 	//Set Hour
-	RTC_TR3 = (uint8_t)ByteToBcd2(SetHour);
+	RTC_TR3 = SetHour;
 
 	//Dummy reading DR3 reg to unfreeze calendar
 	(void)(RTC_DR3);
@@ -156,6 +166,15 @@ void liteRTC_SetHMS(uint8_t SetHour, uint8_t SetMinute, uint8_t SetSecond){// Se
 
 	//lock write protection
 	RTC_WPR = 0xFF; 
+}
+
+/* Parameter descriptions
+ * SetHour : Set Hour (0-23). This code is using 24 hour format
+ * SetMinute : Set Minute (0-59)
+ * SetSecond : Set Second (0-59)
+ */
+void liteRTC_SetHMS(uint8_t SetHour, uint8_t SetMinute, uint8_t SetSecond){// Set the Hour (24Hrs format), Minute, Second
+	liteRTC_SetHMSBCD(ByteToBcd2(SetHour), ByteToBcd2(SetMinute), ByteToBcd2(SetSecond));
 }
 
 /* Parameter descriptions
