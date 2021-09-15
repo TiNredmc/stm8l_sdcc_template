@@ -381,9 +381,9 @@ void watch_Update(){
 	EPW_Clear();
 	
 	if(menuTrack == 0)
-		EPW_Print("Adjust Time:    ", 16);// Menu number 0 : Time.
+		EPW_Print("Adjust Time:\n", 13);// Menu number 0 : Time.
 	else
-		EPW_Print("Adjust Date:    ", 16);// Menu number 1 : Date.
+		EPW_Print("Adjust Date:\n", 13);// Menu number 1 : Date.
 
 	countdown = RTC_TR1;// first lap
 	
@@ -540,9 +540,9 @@ void watch_Update(){
 			case 0xFD: // center button is pressed
 					// save Time/Date setting.
 				if(menuTrack == 0)
-					liteRTC_SetHMS((num2Char[0]*10)+num2Char[1], (num2Char[3]*10)+num2Char[4], (num2Char[6]*10)+num2Char[7]);
+					liteRTC_SetHMSBCD((num2Char[0] << 4) | num2Char[1], (num2Char[3] << 4) | num2Char[4], (num2Char[6] << 4) | num2Char[7]);
 				else
-					liteRTC_SetDMY(Day, (num2DMY[0]*10)+num2DMY[1], (num2DMY[3]*10)+num2DMY[4], (num2DMY[8]*10)+num2DMY[9]);
+					liteRTC_SetDMYBCD(Day, (num2DMY[0] << 4) | num2DMY[1], (num2DMY[3] << 4) | num2DMY[4], (num2DMY[8] << 4) | num2DMY[9]);
 				// reset the Cursor and line position, watch_showMenu() will redraw the text on the FB0.
 				YLine = 1;
 				Xcol = 1;
@@ -551,10 +551,10 @@ void watch_Update(){
 			default:
 				break;
 		}
+		
 	readPin = 0xFF;// reset pin read state
-	YLine = 9;// Force the Cursor to stay on 2nd line,
+	YLine = 9;// Force the Cursor to stay on 2nd line
 	prevXcol = Xcol;// Backup
-	EPW_LoadPartMerge(font8x8_basic + 0x3F, Xcol, 9, 1, 8);// underscore the currently selected digit.
 	if(menuTrack == 0){
 		EPW_Print(num2Char, 8);
 	}else{
@@ -562,6 +562,8 @@ void watch_Update(){
 		EPW_Print("--", 2);
 		EPW_Print(num2DMY, 10);
 	}
+	EPW_LoadPartMerge(font8x8_basic + 0x3F, prevXcol, 9, 1, 8);// underscore the currently selected digit.
+
 	Xcol = prevXcol;// Restore.
 	EPW_Update();// Update display
 	}
@@ -580,7 +582,7 @@ void watch_showMenu(uint8_t menum){
 			watch_readTime(num2Char);
 			
 			// Print to Display and update
-			EPW_Print("Current Time:        ", 21);
+			EPW_Print("Current Time:\n", 14);
 			EPW_Print(num2Char, 8);
 			break;
 		case 1:// show Day of week, Date Month and year.
@@ -589,7 +591,7 @@ void watch_showMenu(uint8_t menum){
 			// I don't implement the grepTime that return(?) the BCD number, so just read directly from shadow registries
 			watch_readDate(num2DMY);
 			
-			EPW_Print("Current Date:", 13);
+			EPW_Print("Current Date:\n", 14);
 			EPW_Print(&DayNames[Day], 3);
 			EPW_Print("--", 2);
 			EPW_Print(num2DMY, 10);
@@ -621,7 +623,7 @@ void watch_handler(){
 			break;
 			
 		case 0xF7:// Right button is pressed. PB3
-			TimeUpdate_lock = 0;// release Tim update lock, make sure that pressing center accidentally won't trigger Tim Update.
+			TimeUpdate_lock = 0;// release Tim update lock, make sure that accidentally pressing center won't trigger Tim Update.
 			menuTrack++;// navigate to next menu.
 			if(menuTrack > (MAX_MENU-1))
 				menuTrack = 0;
@@ -629,7 +631,7 @@ void watch_handler(){
 			break;
 			
 		case 0xFE: // Left button is pressed. PB0
-			TimeUpdate_lock = 0;// release Tim update lock, make sure that pressing center accidentally wont trigger Tim Update
+			TimeUpdate_lock = 0;// release Tim update lock, make sure that accidentally pressing center wont trigger Tim Update
 			if(menuTrack == 0){// if already on the first menu 
 				menuTrack = MAX_MENU - 1;// roll over to the last menu page
 				break;
