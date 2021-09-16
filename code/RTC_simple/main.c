@@ -37,7 +37,7 @@ static uint8_t Bcd2ToByte(uint8_t Value){
   return (uint8_t)(tmp + (Value & (uint8_t)0x0F));
 }
 
-void liteRTC_Init(){ // initialize the clock stuff, and Start RTC
+void RTC_Init(){ // initialize the clock stuff, and Start RTC
 CLK_ICKCR=(1 << CLK_ICKCR_LSION);// turn LowSpeedInternal Clock
 while (!(CLK_ICKCR & (1 << CLK_ICKCR_LSIRDY)));  // enable LSI oscillator.  
 
@@ -88,7 +88,7 @@ CLK_PCKENR2 |= (1 << 2);// enable rtc clock
  * SetMonth : Starting from January (0x01) to December (0x12) 
  * SetYear : starting from 2000 (0) to 2099 (99) 
  */
-void liteRTC_SetDMY(uint8_t SetDay,uint8_t SetDate, uint8_t SetMonth, uint8_t SetYear){// Set Date Month and Year (Year number 1 is Jan and Year nuber 12 is Dec : Very simple All human can do it ;D)
+void RTC_SetDMY(uint8_t SetDay,uint8_t SetDate, uint8_t SetMonth, uint8_t SetYear){// Set Date Month and Year (Year number 1 is Jan and Year nuber 12 is Dec : Very simple All human can do it ;D)
 
 	//unlock the writing protection
 	RTC_WPR = 0xCA;
@@ -101,7 +101,7 @@ void liteRTC_SetDMY(uint8_t SetDay,uint8_t SetDate, uint8_t SetMonth, uint8_t Se
   {
     /* Set the Initialization mode */
     RTC_ISR1 |= (uint8_t)(1 << 7);
-
+	delay_ms(10);// since the printf slowdown enough, this is not require, Go use liteRTC lib!
     /* Wait until INITF flag is set */
     while ((RTC_ISR1 & (1 << 6)) && ( initfcount != 0xFFFF))
     {
@@ -129,7 +129,7 @@ void liteRTC_SetDMY(uint8_t SetDay,uint8_t SetDate, uint8_t SetMonth, uint8_t Se
  * SetMinute : Set Minute (0-59)
  * SetSecond : Set Second (0-59)
  */
-void liteRTC_SetHMS(uint8_t SetHour, uint8_t SetMinute, uint8_t SetSecond){// Set the Hour (24Hrs format), Minute, Second
+void RTC_SetHMS(uint8_t SetHour, uint8_t SetMinute, uint8_t SetSecond){// Set the Hour (24Hrs format), Minute, Second
 	//unlock the writing protection
 	RTC_WPR = 0xCA;
 	RTC_WPR = 0x53;
@@ -142,6 +142,7 @@ void liteRTC_SetHMS(uint8_t SetHour, uint8_t SetMinute, uint8_t SetSecond){// Se
     /* Set the Initialization mode */
     RTC_ISR1 |= (uint8_t)(1 << 7);
     printf("RTC Inited for time update\n");
+	//delay_ms(10);// since the printf slowdown enough, this is not require, Go use liteRTC lib!
     /* Wait until INITF flag is set */
     while ((RTC_ISR1 & (1 << 6)) && ( initfcount != 0xFFFF))
     {
@@ -171,7 +172,7 @@ void liteRTC_SetHMS(uint8_t SetHour, uint8_t SetMinute, uint8_t SetSecond){// Se
  * *rM : pointer to the variable storing Minute
  * *rS : pointer to the variable storing Second
  */
-void liteRTC_grepTime(uint8_t *rH, uint8_t *rM, uint8_t * rS){
+void RTC_grepTime(uint8_t *rH, uint8_t *rM, uint8_t * rS){
 	*rS = Bcd2ToByte(RTC_TR1);
 	*rM = Bcd2ToByte(RTC_TR2);
 	*rH = Bcd2ToByte(RTC_TR3 & 0x3F);// Grep only BCD2 part (we exclude AM/PM notation bit).
@@ -183,7 +184,7 @@ void liteRTC_grepTime(uint8_t *rH, uint8_t *rM, uint8_t * rS){
  * *rMo : pointer to the variable storing Month (in the form of number)
  * *rYe : pointer to the variable storing Year (two last digit 20XX).
  */
-void liteRTC_grepDate(uint8_t *rDay, uint8_t *rDate, uint8_t *rMo, uint8_t *rYe){
+void RTC_grepDate(uint8_t *rDay, uint8_t *rDate, uint8_t *rMo, uint8_t *rYe){
 	*rDate = Bcd2ToByte(RTC_DR1);
 	*rMo = Bcd2ToByte(RTC_DR2);
 	*rYe = Bcd2ToByte(RTC_DR3);
@@ -198,12 +199,12 @@ void main() {
 	SYSCFG_RMPCR1 &= (uint8_t)((uint8_t)((uint8_t)REMAP_Pin << 4) | (uint8_t)0x0F); //remap the non-exit pin of Tx and Rx of the UFQFPN20 package to the exit one.
 	SYSCFG_RMPCR1 |= (uint8_t)((uint16_t)REMAP_Pin & (uint16_t)0x00F0);
 	delay_ms(100);
-	liteRTC_Init();// init RTC system clock
+	RTC_Init();// init RTC system clock
 	printf(" Starting Lite RTC...\n");
 	delay_ms(1000);
-	liteRTC_SetHMS(6, 9, 6);// Set time
+	RTC_SetHMS(6, 9, 6);// Set time
     while (1) {
-	liteRTC_grepTime(&Hour, &Min, &Sec);
+	RTC_grepTime(&Hour, &Min, &Sec);
 	printf("Current Time is : %d : %d : %d\n",Hour, Min, Sec);
 	delay_ms(999);
     }
