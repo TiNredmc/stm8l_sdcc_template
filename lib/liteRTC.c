@@ -7,7 +7,7 @@
 #include <stm8l.h>
 #include <string.h>
 
-
+#include <delay.h>
 
 static uint8_t ByteToBcd2(uint8_t Value){
   uint8_t bcdhigh = 0;
@@ -58,9 +58,9 @@ CLK_PCKENR2 |= (1 << 2);// enable rtc clock
   }
 
 	//set Hour format to 24 hour
-	RTC_CR1 &= ~(1 << 6);
+	// RTC_CR1 &= ~(1 << 6);
 	//Direct R/W on the TRs and DRs reg, By setting bit 4 (BYPSHAD) to 1 
-	RTC_CR1 |= (1 << 4);
+	RTC_CR1 = 0x10;
 
 	//set the Prescalers regs
 	RTC_SPRERH = 0x00;
@@ -92,7 +92,7 @@ void liteRTC_SetDMYBCD(uint8_t SetDay,uint8_t SetDate, uint8_t SetMonth, uint8_t
   {
     /* Set the Initialization mode */
     RTC_ISR1 |= (uint8_t)(1 << 7);
-
+	delay_ms(10);// Our CPU is too fast, so we need to wait a bit
     /* Wait until INITF flag is set */
     while ((RTC_ISR1 & (1 << 6)) && ( initfcount != 0xFFFF))
     {
@@ -143,7 +143,7 @@ void liteRTC_SetHMSBCD(uint8_t SetHour, uint8_t SetMinute, uint8_t SetSecond){//
   {
     /* Set the Initialization mode */
     RTC_ISR1 |= (uint8_t)(1 << 7);
-    
+    delay_ms(10);// Our CPU is too fast, so we need to wait a bit 
     /* Wait until INITF flag is set */
     while ((RTC_ISR1 & (1 << 6)) && ( initfcount != 0xFFFF))
     {
