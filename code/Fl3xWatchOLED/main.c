@@ -131,7 +131,7 @@ const static uint8_t DateColBWLUT[15] = {0,0,0, 1,2 ,0,0, 1, 0,0, 1, 2,3 ,0,0};/
 const static uint8_t timeMaxVal[8]={'2','9',	':', '5','9', ':', '5','9'};// maximum value of each digit on Time.
 // 									   3,1,     1,2, 		20,9,9
 const static uint8_t dateMaxVal[10] = {'3','9', '/', '1','9', '/' ,'2','0', '9','9'};// maximum value of each digit on Date
-
+const static uint8_t date3031[12]={'1','0','1','0','1','0','1','1','0','1','0','1'};// maximum value of ones digit of Date when It's 30 or 31.
 
 /* Extra */
 // External function, fast memcpy (Big thanks lujji for making this possible). check the fastmemcpy.s on the same folder for assembly code.
@@ -339,53 +339,12 @@ while(len--){
 
 // Interrupt Handler for PortB smd joy stick switches.
 void joystick_irq(void) __interrupt(6){
-	__asm__("nop");
 	readPin = PB_IDR;// quickly read the GPIO for further mode select.
 
 	//reset_countdown_timer
 	countdown = RTC_TR1;// recount timer.
 	
 	EXTI_SR2 = 0x01;// clear interrupt pending bit of PortB interrupt.
-}
-
-// Read Hour, Minute and Second of the time shadow registries.
-void watch_readTime(uint8_t *timebuf){
-			second = RTC_TR1;
-			minute = RTC_TR2;
-			hour   = RTC_TR3 & 0x3F;
-			
-			// convert BCD  to char 
-			timebuf[6] = (second >> 4) + 0x30;// convert the tens digit to char 
-			timebuf[7] = (second & 0x0F) + 0x30;// convert the ones digit to char 
-			
-			timebuf[3] = (minute >> 4) + 0x30;// convert the tens digit to char 
-			timebuf[4] = (minute & 0x0F) + 0x30;// convert the ones digit to char 
-			
-			timebuf[0] = (hour >> 4) + 0x30;// convert the tens digit to char 
-			timebuf[1] = (hour & 0x0F) + 0x30;// convert the ones digit to char 
-}
-
-// Read Day of week, Day, Month and last 2 digits of Year of the time shadow registries.
-void watch_readDate(uint8_t *datebuf){
-	
-			//dummy reading the TR1 reg to unfreze the calendar
-			(void)(RTC_TR1);
-			
-			Date = RTC_DR1;
-			Month = RTC_DR2;
-			Day = (uint8_t)(Month >> 5);// grep day of week from Month registry.
-			Year = RTC_DR3;
-			
-			Month &= 0x1F;// clean out the Day of week bits.
-			
-			datebuf[0] = (Date >> 4) + 0x30;
-			datebuf[1] = (Date & 0xF0) + 0x30;
-			
-			datebuf[3] = (Month >> 4) + 0x30;
-			datebuf[4] = (Month & 0x0F) + 0x30;
-			
-			datebuf[8] = (Year >> 4) + 0x30;
-			datebuf[9] = (Year & 0xF0) + 0x30;
 }
 
 // Update Time and Date.
@@ -427,7 +386,7 @@ void watch_Update(){
 					
 				Xcol--;
 				if(menuTrack == 0){
-					if(num2Char[Xcol] == ':')// detect the ':' 
+					if(num2Char[Xcol-1] == ':')// detect the ':' 
 						Xcol--;
 				}else{
 					Xcol -= DateColBWLUT[Xcol-1];	
@@ -482,14 +441,11 @@ void watch_Update(){
 							
 						}
 						
+						
 						if(num2DMY[0] == '3'){// if it's day 30 or 31.
-							if(((num2DMY[3]-0x30)*10 + num2DMY[4]-0x30) % 2){// month that divisible with 2 will have 30 days (except Feb which is already dealed with above if-elses).
-								if(num2DMY[4] > '0')// Month that have only 30 day's, ones digit can't greater than 0
-									num2DMY[4] = '0';
-							
-							}else{
-								if(num2DMY[4] > '1')// Month that have 31 day's, ones digit can't greater than 1.
-									num2DMY[4] = '1';
+							if(date3031[((num2DMY[3]-0x30)*10 + num2DMY[4]-0x30) - 1]){// use LUT to check which month has 30 or 31 days (except Feb which is already dealed with above if-elses).
+								if(num2DMY[4] > date3031[((num2DMY[3]-0x30)*10 + num2DMY[4]-0x30) - 1])// check for number that out of bound.
+									num2DMY[4] = date3031[((num2DMY[3]-0x30)*10 + num2DMY[4]-0x30) - 1];
 							}
 						}
 
@@ -508,14 +464,14 @@ void watch_Update(){
 				if(menuTrack == 0){
 					if(num2Char[tPosLUT[Xcol-1]] == '0')// never goes below 0 and get rick roll over.
 						break;
-					num2Char[tPosLUT[Xcol]]--;
+					num2Char[tPosLUT[Xcol-1]]--;
 				}else{
 					if(Xcol < 4){// column is in region of Day of week.
 						if(Day == 1)
 							break;
 						Day--;
 					}else{
-						if(num2DMY[dPosLUT[Xcol-6]] == '0')// never goes below 0 and get rick roll over.
+						if(num2DMY[dPosLUT[Xcol-6]] == '1')// never goes below 0 and get rick roll over.
 							break;
 						num2DMY[dPosLUT[Xcol-6]]--;
 					}
@@ -526,10 +482,19 @@ void watch_Update(){
 					// save Time/Date setting.
 				TimeUpdate_lock +=1;
 				if(TimeUpdate_lock == 2){// If pressed 2 times.
-					if(menuTrack == 0)
-						liteRTC_SetHMSBCD((num2Char[0] << 4) | num2Char[1], (num2Char[3] << 4) | num2Char[4], (num2Char[6] << 4) | num2Char[7]);
-					else
-						liteRTC_SetDMYBCD(Day, (num2DMY[0] << 4) | num2DMY[1], (num2DMY[3] << 4) | num2DMY[4], (num2DMY[8] << 4) | num2DMY[9]);
+					TimeUpdate_lock = 0;
+					__asm__("sim");// spinlock
+					if(menuTrack == 0){
+						/*
+						hour = (uint8_t)((num2Char[0] - 0x30) << 4) | (num2Char[1] - 0x30);
+						minute = (uint8_t)((num2Char[3] - 0x30) << 4) | (num2Char[4] - 0x30);
+						second = (uint8_t)((num2Char[6] - 0x30) << 4) | (num2Char[7] - 0x30);
+						liteRTC_SetHMSBCD(hour, minute, second);*/
+					}else{
+						//liteRTC_SetDMYBCD(Day, ((num2DMY[0]-0x30) << 4) | (num2DMY[1]-0x30), ((num2DMY[3]-0x30) << 4) | (num2DMY[4]-0x30), ((num2DMY[8]-0x30) << 4) | (num2DMY[9]-0x30));
+					}
+					__asm__("rim");// de-spinlock
+					
 					// reset the Cursor and line position, watch_showMenu() will redraw the text on the FB0.
 					YLine = 1;
 					Xcol = 1;
@@ -568,7 +533,19 @@ void watch_showMenu(uint8_t menum){
 			// grep time from shadow registries
 			// liteRTC_grepTime(&hour, &minute, &second);
 			// I don't implement the grepTime that return(?) the BCD number, so just read directly from shadow registries
-			watch_readTime(num2Char);
+			second = RTC_TR1;
+			minute = RTC_TR2;
+			hour   = RTC_TR3 & 0x3F;
+			
+			// convert BCD  to char 
+			num2Char[6] = (second >> 4) + 0x30;// convert the tens digit to char 
+			num2Char[7] = (second & 0x0F) + 0x30;// convert the ones digit to char 
+			
+			num2Char[3] = (minute >> 4) + 0x30;// convert the tens digit to char 
+			num2Char[4] = (minute & 0x0F) + 0x30;// convert the ones digit to char 
+			
+			num2Char[0] = (hour >> 4) + 0x30;// convert the tens digit to char 
+			num2Char[1] = (hour & 0x0F) + 0x30;// convert the ones digit to char 
 			
 			// Print to Display and update
 			EPW_Print("Current Time:\n", 14);
@@ -578,7 +555,23 @@ void watch_showMenu(uint8_t menum){
 			
 			//liteRTC_grepDate(&Day, &Date, &Month, &Year);
 			// I don't implement the grepTime that return(?) the BCD number, so just read directly from shadow registries
-			watch_readDate(num2DMY);
+
+			Date = RTC_DR1;
+			Month = RTC_DR2;
+			Day = (uint8_t)(Month >> 5);// grep day of week from Month registry.
+			Year = RTC_DR3;
+			
+			Month &= 0x1F;// clean out the Day of week bits.
+			
+			num2DMY[0] = (Date >> 4) + 0x30;
+			num2DMY[1] = (Date & 0x0F) + 0x30;
+			
+			num2DMY[3] = (Month >> 4) + 0x30;
+			num2DMY[4] = (Month & 0x0F) + 0x30;
+			
+			num2DMY[8] = (Year >> 4) + 0x30;
+			num2DMY[9] = (Year & 0x0F) + 0x30;
+
 			
 			EPW_Print("Current Date:\n", 14);
 			EPW_Print(&DayNames[Day], 3);
@@ -663,8 +656,6 @@ void main(){
 	
 	// Start the OLED display
 	EPW_start();
-	delay_ms(100);
-	
 	while(1){
 		watch_handler();// watch handler, including menu select, Enter update mode, and put to sleep.
 	}// While loop
