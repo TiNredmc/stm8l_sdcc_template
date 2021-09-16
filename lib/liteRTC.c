@@ -99,15 +99,15 @@ void liteRTC_SetDMYBCD(uint8_t SetDay,uint8_t SetDate, uint8_t SetMonth, uint8_t
       initfcount++;
     }
   }
-	//dummy reading the TR1 reg
+	//dummy reading the TR1 reg to unfreze the calendar
 	(void)(RTC_TR1);
 
 	//Set Date
-	RTC_DR1 = SetDate;
+	RTC_DR1 = (uint8_t)SetDate;
 	//Set Month
-	RTC_DR2 = SetMonth | (uint8_t)(SetDay << 5);
+	RTC_DR2 = (uint8_t)SetMonth | (uint8_t)(SetDay << 5);
 	//Set Year
-	RTC_DR3 = SetYear;
+	RTC_DR3 = (uint8_t)SetYear;
 
 	//exit init mode
 	RTC_ISR1 &= ~(1 << 7);
@@ -123,7 +123,7 @@ void liteRTC_SetDMYBCD(uint8_t SetDay,uint8_t SetDate, uint8_t SetMonth, uint8_t
  * SetYear : starting from 2000 (0) to 2099 (99) 
  */
 void liteRTC_SetDMY(uint8_t SetDay,uint8_t SetDate, uint8_t SetMonth, uint8_t SetYear){// Set Date Month and Year (Year number 1 is Jan and Year nuber 12 is Dec : Very simple All human can do it ;D)
-	liteRTC_SetDMYBCD(ByteToBcd2(SetDay), ByteToBcd2(SetDate), ByteToBcd2(SetMonth), ByteToBcd2(SetYear));
+	liteRTC_SetDMYBCD(SetDay, ByteToBcd2(SetDate), ByteToBcd2(SetMonth), ByteToBcd2(SetYear));
 }
 
 /* Parameter descriptions (In BCD format).
@@ -152,13 +152,13 @@ void liteRTC_SetHMSBCD(uint8_t SetHour, uint8_t SetMinute, uint8_t SetSecond){//
   }
 
 	//Set Second
-	RTC_TR1 = SetSecond;
+	RTC_TR1 = (uint8_t)SetSecond;
 	//Set Minute 
-	RTC_TR2 = SetMinute;
+	RTC_TR2 = (uint8_t)SetMinute;
 	//Set Hour
-	RTC_TR3 = SetHour;
+	RTC_TR3 = (uint8_t)SetHour;
 
-	//Dummy reading DR3 reg to unfreeze calendar
+	//Dummy reading DR3 reg to unfreeze the calendar
 	(void)(RTC_DR3);
 
 	//exit init mode
@@ -195,6 +195,9 @@ void liteRTC_grepTime(uint8_t *rH, uint8_t *rM, uint8_t * rS){
  * *rYe : pointer to the variable storing Year (two last digit 20XX).
  */
 void liteRTC_grepDate(uint8_t *rDay, uint8_t *rDate, uint8_t *rMo, uint8_t *rYe){
+	//dummy reading the TR1 reg to unfreze the calendar
+	(void)(RTC_TR1);
+	
 	*rDate = Bcd2ToByte(RTC_DR1);
 	*rMo = Bcd2ToByte(RTC_DR2);
 	*rYe = Bcd2ToByte(RTC_DR3);
