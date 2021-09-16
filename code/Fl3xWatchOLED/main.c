@@ -485,13 +485,9 @@ void watch_Update(){
 					TimeUpdate_lock = 0;
 					__asm__("sim");// spinlock
 					if(menuTrack == 0){
-						/*
-						hour = (uint8_t)((num2Char[0] - 0x30) << 4) | (num2Char[1] - 0x30);
-						minute = (uint8_t)((num2Char[3] - 0x30) << 4) | (num2Char[4] - 0x30);
-						second = (uint8_t)((num2Char[6] - 0x30) << 4) | (num2Char[7] - 0x30);
-						liteRTC_SetHMSBCD(hour, minute, second);*/
+						liteRTC_SetHMSBCD(((num2Char[0] - 0x30) << 4) | (num2Char[1] - 0x30), ((num2Char[3] - 0x30) << 4) | (num2Char[4] - 0x30), ((num2Char[6] - 0x30) << 4) | (num2Char[7] - 0x30));
 					}else{
-						//liteRTC_SetDMYBCD(Day, ((num2DMY[0]-0x30) << 4) | (num2DMY[1]-0x30), ((num2DMY[3]-0x30) << 4) | (num2DMY[4]-0x30), ((num2DMY[8]-0x30) << 4) | (num2DMY[9]-0x30));
+						liteRTC_SetDMYBCD(Day, ((num2DMY[0]-0x30) << 4) | (num2DMY[1]-0x30), ((num2DMY[3]-0x30) << 4) | (num2DMY[4]-0x30), ((num2DMY[8]-0x30) << 4) | (num2DMY[9]-0x30));
 					}
 					__asm__("rim");// de-spinlock
 					
