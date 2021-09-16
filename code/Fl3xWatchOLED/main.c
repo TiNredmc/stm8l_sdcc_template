@@ -112,7 +112,7 @@ uint8_t num2Char[8]={0,0,':',0,0,':',0,0};// store the time in char format "HH:M
 // DMY keeping, read from RTC shadow registries.
 uint8_t Day, Date, Month, Year;
 // convert day of week number to day name.
-const static uint8_t DayNames[7]={" MON", " TUE", " WEN", " THU", " FRI", " SAT", " SUN"};
+const static uint8_t DayNames[8]={"ERR","MON", "TUE", "WEN", "THU", "FRI", "SAT", "SUN"};
 uint8_t num2DMY[10]={0,0, '/', 0,0, '/', '2','0', 0, 0};// store the date, month and year in cahr format "DD/MM/20YY"
 
 /* Look up tables*/
@@ -123,14 +123,14 @@ const static uint8_t dPosLUT[10] = {0,1 ,0 ,3,4 ,0 ,0 ,0 ,8,9};// array position
 
 // column skipping steps, to make sure that cursor never lands on the fixed Char.
 //								M,O,N, -,- ,0,1, /, 0,1, /, 2,0, 2,1
-const static uint8_t DateColFWLUT[15] = {0,0,0, 2,1 ,0,0, 1, 0,0, 3, 2,1 ,0,00};// for cursor going forward
-const static uint8_t DateColBWLUT[15] = {0,0,0, 1,2 ,0,0, 1, 0,0, 1, 2,3 ,0,00};// for cursor going backward
+const static uint8_t DateColFWLUT[15] = {0,0,0, 2,1 ,0,0, 1, 0,0, 3, 2,1 ,0,0};// for cursor going forward
+const static uint8_t DateColBWLUT[15] = {0,0,0, 1,2 ,0,0, 1, 0,0, 1, 2,3 ,0,0};// for cursor going backward
 
-// Maximum value of Time and Date.
+// Maximum value of Time and Date. Char data type.
 //				   				    2,3/9, 5,9, 
-const static uint8_t timeMaxVal[8]={2,9,	':', 5,9, ':', 5,9};// maximum value of each digit on Time.
+const static uint8_t timeMaxVal[8]={'2','9',	':', '5','9', ':', '5','9'};// maximum value of each digit on Time.
 // 									   3,1,     1,2, 		20,9,9
-const static uint8_t dateMaxVal[10] = {3,9, '/', 1,9, '/' ,'2','0', 9,9};// maximum value of each digit on Date
+const static uint8_t dateMaxVal[10] = {'3','9', '/', '1','9', '/' ,'2','0', '9','9'};// maximum value of each digit on Date
 
 
 /* Extra */
@@ -368,6 +368,9 @@ void watch_readTime(uint8_t *timebuf){
 // Read Day of week, Day, Month and last 2 digits of Year of the time shadow registries.
 void watch_readDate(uint8_t *datebuf){
 	
+			//dummy reading the TR1 reg to unfreze the calendar
+			(void)(RTC_TR1);
+			
 			Date = RTC_DR1;
 			Month = RTC_DR2;
 			Day = (uint8_t)(Month >> 5);// grep day of week from Month registry.
@@ -387,6 +390,7 @@ void watch_readDate(uint8_t *datebuf){
 
 // Update Time and Date.
 void watch_Update(){
+	readPin = 0xFF;// reset pin read state
 	uint8_t prevXcol = 1;// store previous cursor Xcol position and restore it after EPW_Print.
 	EPW_Clear();
 	
@@ -397,7 +401,7 @@ void watch_Update(){
 
 	countdown = RTC_TR1;// first lap
 	
-	while ((RTC_TR1 - countdown) < SCREEN_TIMEOUT){
+	while ((RTC_TR1 - countdown) < (SCREEN_TIMEOUT*2)){
 		switch(readPin){
 			case 0xF7: // right button is pressed.
 				// move cursor forward.
@@ -405,22 +409,11 @@ void watch_Update(){
 				
 				if(menuTrack == 0){
 					// Cursor never lands on ':'
-					if(num2Char[Xcol] == ':')// detect the ':' 
+					if(num2Char[Xcol-1] == ':')// detect the ':' 
 						Xcol++;
-					//if ((Xcol == 3) || (Xcol == 6))// Cursor never lands on ':' (Time) or '/' (Date). 
-					//	Xcol++;
 				}else{
 					// according to the lut table 
 					Xcol += DateColFWLUT[Xcol-1];
-					/*
-					if ((Xcol == 4)  || (Xcol == 12)) 
-						Xcol += 2;
-					
-					if ((Xcol == 5) || (Xcol == 13) || (Xcol == 8))
-						Xcol++;
-					
-					if (Xcol == 11)
-						Xcol += 3;*/
 				}	
 					
 				if (Xcol > (menuTrack ? 15 : 8))// Cursor never goes beyond 8 (Time) or 15 (Date).
@@ -434,19 +427,10 @@ void watch_Update(){
 					
 				Xcol--;
 				if(menuTrack == 0){
-					if(num2Char[Xcol] = ':')// detect the ':' 
+					if(num2Char[Xcol] == ':')// detect the ':' 
 						Xcol--;
 				}else{
-					Xcol -= (DateColBWLUT[Xcol-1]);
-					
-					/*if ((Xcol == 4) || (Xcol == 8) || (Xcol == 11)) 
-						Xcol--;
-					
-					if ((Xcol == 5) || (Xcol == 12)) 
-						Xcol -= 2;
-					
-					if (Xcol == 13)
-						Xcol -= 3;*/
+					Xcol -= DateColBWLUT[Xcol-1];	
 				}
 					
 				break;
@@ -463,23 +447,8 @@ void watch_Update(){
 						num2Char[tPosLUT[Xcol-1]] = timeMaxVal[tPosLUT[Xcol-1]];
 					
 					// Hour maximum is 23
-					if((num2Char[0] == 2) && (num2Char[1] > 3))// Hour can't greater than 23.
-							num2Char[1] = 3;
-
-					/*if(num2Char[1] > 9)// When hour is between 0-19, ones digit can't greater than 9
-						num2Char[1] = 9;
-
-					// Minute maximum is 59
-					if(num2Char[3] > 5)
-						num2Char[3] = 5;
-					if(num2Char[4] > 9)
-						num2Char[4] = 9;
-					
-					// Second maximum is 59 
-					if(num2Char[6] > 5)
-						num2Char[6] = 5;
-					if(num2Char[7] > 9)
-						num2Char[7] = 9;*/
+					if((num2Char[0] == '2') && (num2Char[1] > '3'))// Hour can't greater than 23.
+							num2Char[1] = '3';
 					
 				}else{
 					// Date update
@@ -492,55 +461,44 @@ void watch_Update(){
 						// Date Update.
 						num2DMY[dPosLUT[Xcol-6]]++;
 						
-						uint16_t year = 2000 + (num2DMY[8]*10 + num2DMY[9]);// store the number of year to calculate the leap year.
+						uint16_t year = 2000 + ( (num2DMY[8]-0x30) *10 + num2DMY[9]-0x30);// store the number of year to calculate the leap year.
 						
 						// check whether the number is out of bound. 
-						if(num2DMY[dPosLUT[Xcol-1]] > dateMaxVal[dPosLUT[Xcol-1]])
-							num2DMY[dPosLUT[Xcol-1]] = dateMaxVal[dPosLUT[Xcol-1]];
+						if(num2DMY[dPosLUT[Xcol-6]] > dateMaxVal[dPosLUT[Xcol-6]])
+							num2DMY[dPosLUT[Xcol-6]] = dateMaxVal[dPosLUT[Xcol-6]];
 						
 						// Date maximum is 31, with leap year check.
-						if((num2DMY[3]*10 + num2DMY[4]) == 2){// Check if it's Feb.
-								if(num2DMY[0] > 2)// date tens digit can't greater than 2
-									num2DMY[0] = 2;
+						if(((num2DMY[3]-0x30)*10 + num2DMY[4]-0x30) == '2'){// Check if it's Feb.
+								if(num2DMY[0] > '2')// date tens digit can't greater than 2
+									num2DMY[0] = '2';
 								
 								if( ((year%4) == 0) && (((year%400) == 0) || ( (year%100) != 0 )) ){// If it's leap year.
-									if(num2DMY[1] > 9) // Allow up to 29th Feb.
-										num2DMY[1] = 9;
+									if(num2DMY[1] > '9') // Allow up to 29th Feb.
+										num2DMY[1] = '9';
 								}else{
-									if(num2DMY[1] > 8)// Otherwise It's only 28th Feb.
-										num2DMY[1] = 8;
+									if(num2DMY[1] > '8')// Otherwise It's only 28th Feb.
+										num2DMY[1] = '8';
 								}
 							
 						}
 						
-						if(num2DMY[0] == 3){// if it's day 30 or 31.
-							if((num2DMY[3]*10 + num2DMY[4]) % 2){// month that divisible with 2 will have 30 days (except Feb which is already dealed with above if-elses).
-								if(num2DMY[4] > 0)// Month that have only 30 day's, ones digit can't greater than 0
-									num2DMY[4] = 0;
+						if(num2DMY[0] == '3'){// if it's day 30 or 31.
+							if(((num2DMY[3]-0x30)*10 + num2DMY[4]-0x30) % 2){// month that divisible with 2 will have 30 days (except Feb which is already dealed with above if-elses).
+								if(num2DMY[4] > '0')// Month that have only 30 day's, ones digit can't greater than 0
+									num2DMY[4] = '0';
 							
 							}else{
-								if(num2DMY[4] > 1)// Month that have 31 day's, ones digit can't greater than 1.
-									num2DMY[4] = 1;
+								if(num2DMY[4] > '1')// Month that have 31 day's, ones digit can't greater than 1.
+									num2DMY[4] = '1';
 							}
 						}
-						/*if(num2DMY[1] > 9)// When Day is between 1 and 29, ones digit can't greater than 9.
-							num2DMY[1] = 9;*/
-						
+
 						// Month maximum is 12
-						if(num2DMY[3] > 1){// if it's month 10 11 or 12
-							if(num2DMY[4] > 2)// Month can't greater than 12.
-								num2DMY[4] = 2;
+						if(num2DMY[3] > '1'){// if it's month 10 11 or 12
+							if(num2DMY[4] > '2')// Month can't greater than 12.
+								num2DMY[4] = '2';
 						}
 						
-						/*if(num2DMY[4] > 9)// When Month is between 1 and 9, ones digit can't greater than 9.
-							num2DMY[4] = 9;
-
-						// Year maximum is 99 
-						if(num2DMY[8] > 9)
-							num2DMY[8] = 9;
-						if(num2DMY[9] > 9)
-							num2DMY[9] = 9;*/
-								 
 					}
 				}
 				break;
@@ -548,7 +506,7 @@ void watch_Update(){
 			case 0xEF: // Down button is pressed.
 				// Decrease value (of that digit).
 				if(menuTrack == 0){
-					if(num2Char[tPosLUT[Xcol-1]] == 0)// never goes below 0 and get rick roll over.
+					if(num2Char[tPosLUT[Xcol-1]] == '0')// never goes below 0 and get rick roll over.
 						break;
 					num2Char[tPosLUT[Xcol]]--;
 				}else{
@@ -557,7 +515,7 @@ void watch_Update(){
 							break;
 						Day--;
 					}else{
-						if(num2DMY[dPosLUT[Xcol-6]] == 0)// never goes below 0 and get rick roll over.
+						if(num2DMY[dPosLUT[Xcol-6]] == '0')// never goes below 0 and get rick roll over.
 							break;
 						num2DMY[dPosLUT[Xcol-6]]--;
 					}
@@ -566,14 +524,17 @@ void watch_Update(){
 					
 			case 0xFD: // center button is pressed
 					// save Time/Date setting.
-				if(menuTrack == 0)
-					liteRTC_SetHMSBCD((num2Char[0] << 4) | num2Char[1], (num2Char[3] << 4) | num2Char[4], (num2Char[6] << 4) | num2Char[7]);
-				else
-					liteRTC_SetDMYBCD(Day, (num2DMY[0] << 4) | num2DMY[1], (num2DMY[3] << 4) | num2DMY[4], (num2DMY[8] << 4) | num2DMY[9]);
-				// reset the Cursor and line position, watch_showMenu() will redraw the text on the FB0.
-				YLine = 1;
-				Xcol = 1;
-				return;// exit the timeUpdate function
+				TimeUpdate_lock +=1;
+				if(TimeUpdate_lock == 2){// If pressed 2 times.
+					if(menuTrack == 0)
+						liteRTC_SetHMSBCD((num2Char[0] << 4) | num2Char[1], (num2Char[3] << 4) | num2Char[4], (num2Char[6] << 4) | num2Char[7]);
+					else
+						liteRTC_SetDMYBCD(Day, (num2DMY[0] << 4) | num2DMY[1], (num2DMY[3] << 4) | num2DMY[4], (num2DMY[8] << 4) | num2DMY[9]);
+					// reset the Cursor and line position, watch_showMenu() will redraw the text on the FB0.
+					YLine = 1;
+					Xcol = 1;
+					return;// exit the timeUpdate function
+				}
 				
 			default:
 				break;
@@ -582,6 +543,7 @@ void watch_Update(){
 	readPin = 0xFF;// reset pin read state
 	YLine = 9;// Force the Cursor to stay on 2nd line
 	prevXcol = Xcol;// Backup
+	Xcol = 1;// reset column
 	if(menuTrack == 0){
 		EPW_Print(num2Char, 8);
 	}else{
@@ -589,7 +551,7 @@ void watch_Update(){
 		EPW_Print("--", 2);
 		EPW_Print(num2DMY, 10);
 	}
-	EPW_LoadPartMerge(font8x8_basic + 0x3F, prevXcol, 9, 1, 8);// underscore the currently selected digit.
+	EPW_LoadPartMerge(font8x8_basic + 504, prevXcol, 9, 1, 8);// underscore the currently selected digit.
 
 	Xcol = prevXcol;// Restore.
 	EPW_Update();// Update display
@@ -678,8 +640,7 @@ void watch_handler(){
 	countdown = 0;
 	
 	// enter sleep mode.
-	EPW_Clear();// claer Buffer before going to sleep.
-	EXTI_SR2 = 0x01;// clear interrupt pending bit of PortB interrupt.
+	// EXTI_SR2 = 0x01;// clear interrupt pending bit of PortB interrupt.
 	EPW_DispOn(false);// turn display of via command then turn of the Boost IC.
 	__asm__("halt");// halt CPU, Now in active halt mode. Only RTC and ITC are running.
 }
@@ -700,7 +661,7 @@ void main(){
 	// Clean Frame Buffer for Fresh init.
 	EPW_Clear();
 	
-	//Start the OLED display
+	// Start the OLED display
 	EPW_start();
 	delay_ms(100);
 	
