@@ -19,6 +19,9 @@ void SPI_Init(uint8_t spi_speed) {
 
 	SPI1_CR1 |= (1 << SPI1_CR1_MSTR) | (spi_speed << 3);
 	SPI1_CR2 |= (1 << SPI1_CR2_SSM) | (1 << SPI1_CR2_SSI);
+#ifdef LSB_First
+	SPI1_CR1 |= (1 << 7);// select the LSB first mode.
+#endif
 	//SPI1_CR2 &= ~(1 << SPI1_CR2_BDM);
 	SPI1_CR1 |= (1 << 6);// Enable SPI1 
 }
