@@ -44,7 +44,7 @@ uint8_t FM25_WRSR	= 0x01;// Write Status Register
 const uint8_t FMID[9] = {
 	0x7f,0x7f,0x7f,
 	0x7f,0x7f,0x7f,
-	0xC2,0x21,0x08
+	0xC2,0x21,0x08// ignore last byte, seems to vary through revision according to datasheet.
 };
 uint8_t match_data[9];// store the received device ID (for debugging).
 
@@ -62,6 +62,12 @@ void prntf(char *p){
 	}
 }
 
+void prntfM(uint8_t *p, size_t len){
+	while(len--){
+		usart_write(*p++);
+	}
+}
+
 // Initialize PB4 as Chip select pin 
 void setpin(){
 	PB_DDR |= (1 << SCS);
@@ -75,8 +81,8 @@ void setpin(){
  * RSR -> pointer to the byte storing Status data 
  */
 void FM25_checkSR(uint8_t *RSR){
-	PB_ODR &= (0 << SCS);// \_
-	SPI_WriteThenRead(&FM25_RDSR, RSR, 1);
+	PB_ODR &= ~(1 << SCS);// \_
+	SPI_WriteThenRead(&FM25_RDSR, 1, RSR, 1);
 	PB_ODR |= (1 << SCS);// _/
 }
 
@@ -90,14 +96,14 @@ void FM25_writeSR(uint8_t *RSR){
 	wrtSR[0] = FM25_WRSR;
 	wrtSR[1] = *RSR;
 	
-	PB_ODR &= (0 << SCS);// \_
+	PB_ODR &= ~(1 << SCS);// \_
 	SPI_Write(wrtSR, 2);
 	PB_ODR |= (1 << SCS);// _/
 }
 // Write enable latch (unlock once, write as many times as you want ;D)
 void FM25_unlock(){
 	// Write command to unlock write protection
-	PB_ODR &= (0 << SCS);// \_
+	PB_ODR &= ~(1 << SCS);// \_
 	SPI_Write(&FM25_WREN, 1);
 	PB_ODR |= (1 << SCS);// _/
 	
@@ -111,7 +117,7 @@ void FM25_unlock(){
 // Disable write enable latch (lock once, no write allowed !)
 void FM25_lock(){
 	// Write command to lock write protection
-	PB_ODR &= (0 << SCS);// \_
+	PB_ODR &= ~(1 << SCS);// \_
 	SPI_Write(&FM25_WRDI, 1);
 	PB_ODR |= (1 << SCS);// _/
 	
@@ -134,8 +140,8 @@ void FM25_writeBuf(uint8_t *Src, uint16_t offset, size_t len){
 	wrtBF[1] = (uint8_t)(offset >> 8);
 	wrtBF[2] = (uint8_t)offset;
 
-	PB_ODR &= (0 << SCS);// \_
-	SPI_WriteThenWrite(wrtBF, Src, len);
+	PB_ODR &= ~(1 << SCS);// \_
+	SPI_WriteThenWrite(wrtBF, 3, Src, len);
 	PB_ODR |= (1 << SCS);// _/
 }
 
@@ -152,9 +158,9 @@ void FM25_readBuf(uint8_t *Dest, uint16_t offset, size_t len){
 	wrtBF[1] = (uint8_t)(offset >> 8);
 	wrtBF[2] = (uint8_t)offset;
 
-	PB_ODR &= (0 << SCS);// \_
+	PB_ODR &= ~(1 << SCS);// \_
 	// Send command and offset to F-RAM, F-RAM respond with data reading
-	SPI_WriteThenRead(wrtBF, Dest, len);
+	SPI_WriteThenRead(wrtBF, 3, Dest, len);
 	PB_ODR |= (1 << SCS);// _/
 }
 
@@ -168,21 +174,21 @@ void FM25_readBuf(uint8_t *Dest, uint16_t offset, size_t len){
 // Put F-RAM into Sleep mode
 // Activity that pull Chip select pin down will wake the F-RAM from sleep
 void FM25_sleep(){
-	PB_ODR &= (0 << SCS);// \_
+	PB_ODR &= ~(1 << SCS);// \_
 	SPI_Write(&FM25_SLEEP, 1);
 	PB_ODR |= (1 << SCS);// _/
 }
 
 // Return device match 
-/* 1 -> FM25V01A is found
- * 0 -> FM25V01A is not found
+/* 0 -> FM25V01A is found
+ * 1 -> FM25V01A is not found
  */
 int FM25_devMatch(){
-	PB_ODR &= (0 << SCS);// \_
-	SPI_WriteThenRead(&FM25_RDID, match_data, 9);
+	PB_ODR &= ~(1 << SCS);// \_
+	SPI_WriteThenRead(&FM25_RDID, 1, match_data, 9);
 	PB_ODR |= (1 << SCS);// _/
 	
-	return memcmp(match_data, FMID, 9);
+	return memcmp(match_data, FMID, 8);// last byte seems to vary on device revision, so just don't check them.
 }
 
 void main(){
@@ -199,27 +205,23 @@ void main(){
 	// No Device match, Check the connection ?
 	prntf("No Device match !, Please check the connection\n");
 	prntf("Device ID read out:");
-	prntf(match_data);
+	prntfM(match_data, 9);
 	prntf("\nProgram halted!");
 	while(1);// halt the program by put into infinite loop
-	}else{
+	}
 	prntf("Device found, Unlocking...\n");
 	FM25_unlock();// Unlock F-RAM, ready to write anytime.
-	}
-
-	prntf("Start writing...\n");
-	FM25_writeBuf("TinLethax!", 0x1234, 10);// Write "TinLethax!" to offset 0x1234 on the flash
+	
+	prntf("writing 'TinLethax!'...\n");
+	FM25_writeBuf("TinLethax!", 0, 10);// Write "TinLethax!" to offset 0x1234 on the flash
 	prntf("Done\n");
 	prntf("Start reading...\n");
-	FM25_readBuf(exmBuf, 0x1234, 10);
+	FM25_readBuf(exmBuf, 0, 10);
 	prntf("Done\n");
 	prntf("readback is :");
-	prntf(exmBuf);
+	prntfM(exmBuf, 10);
 	prntf("\nDone");
 	while(1){
-	
-
-
 
 	}
 
