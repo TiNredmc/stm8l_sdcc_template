@@ -7,7 +7,7 @@
 void i2c_init(uint8_t devID, uint8_t SCLSpeed) { // init I2C with Own Device address (Master address) and I2C Speed 
     CLK_CKDIVR = 0x00; // No clock divider
     CLK_PCKENR1 |= 0x08;// enable the I2C clock 
-    I2C1_FREQR |= F_CPU/1000000 ;// 16MHz/10^6
+    I2C1_FREQR |= F_CPU/1000000 ;// Use peritpheral clock to generate I2C waveform, for example 16MHz/10^6
 	
     I2C1_CR1 &= ~0x01;// cmd disable for i2c configurating
 
