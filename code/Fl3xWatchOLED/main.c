@@ -146,6 +146,13 @@ void GPIO_init(){
 	PC_CR1 |= (1 << EPW_RSTB) | (1 << EPW_VBOOST);// with push pull mode.
 	PC_CR1 |= 0x40;// configure PB6 as input pull up, This will stop noise from triggering Schimitt trigger (low power design).
 	
+	/* Port B to switch connection (please take look at the schematic of Fl3xWatch)
+	PB0 -> LEFT
+	PB1 -> CENTER
+	PB2 -> Up
+	PB3 -> Right
+	PB4 -> Down
+	*/
 	// Init entire port B as input but only B0 to B4 as a input with PortB interrupt.
 	PB_DDR = 0;// PB0-PB7 as input, We only use PB0-4 other pins just left unused with internal pull-up (low power design).
 	PB_CR1 = 0xFF;// Entire port With pull up resistor.
@@ -642,7 +649,7 @@ void watch_handler(){
 
 void main(){
 	GPIO_init();// GPIO Init
-	i2c_init(0x00, I2C_400K);// I2C at 400KHz
+	i2c_init(0x00, I2C_400K);// I2C at 400KHz, SDA on PC0 SCL on PC1
 	liteRTC_Init();// Init RTC peripheral.
 	PWR_CSR2 |= (1 << 1);// disable ADC ref voltage regulator when sleeping. (No effect sine we don't use ADC).
 	
