@@ -3,13 +3,11 @@
  */
  
 /* Data report structure : report ASCII code upto 6 bytes (keys) per 1 packet
- * 		report_byte -> MSB[Key 6][Key 5][Key 4][Key 3][Key 2][Key 1]LSB (Note : It's dynamics. I allow the MCU to report from 1 to 6 bytes).
+ * 		report_byte -> MSB[Report size][Key 6][Key 5][Key 4][Key 3][Key 2][Key 1]LSB (Note : It's dynamics. I allow the MCU to report from 1 to 6 bytes).
  */
  
 #include <stm8l.h>
-#include <stdint.h>
 #include <stdio.h>
-#include <string.h>
 #include <usart.h>
 #include <delay.h>
 
@@ -24,11 +22,11 @@ static uint8_t report_order = 0;
 
 // const array for GPIOs scanning.
 const static uint8_t kb_scanner[5] = 
-{0x1E, // (PB0)[0][1][1][1][1](PB4)
-0x1D, //  (PB0)[1][0][1][1][1](PB4)
-0x1B, //  (PB0)[1][1][0][1][1](PB4)
-0x17, //  (PB0)[1][1][1][0][1](PB4)
-0x0F}; // (PB0)[1][1][1][1][0](PB4)
+{0x1E, // (PB4)[1][1][1][1][0](PB0)
+0x1D, //  (PB4)[1][1][1][0][1](PB0)
+0x1B, //  (PB4)[1][1][0][1][1](PB0)
+0x17, //  (PB4)[1][0][1][1][1](PB0)
+0x0F}; // (PB4)[0][1][1][1][1](PB0)
 
 static uint8_t scanner_cnt = 0;// keep track of current column.
 
@@ -39,6 +37,9 @@ const static uint8_t row2_left[5] = {'a', 's', 'd', 'f', 'g'};
 const static uint8_t row2_right[5] = {'h', 'j', 'k', 'l', 8};// last one is back space.
 const static uint8_t row3_left[5] = {'z', 'x', 'c', 'v', ' '};
 const static uint8_t row3_right[5] = {0, 'B', 'N', 'M', 10};// 10 -> Line feed -> new line -> "enter" likes -> enter key.
+
+// Interrupt related stuffs
+volatile static uint8_t kbd_flag = 0;
 
 #define REMAP_Pin 0x011C 
 
@@ -125,6 +126,20 @@ void i2cirq(void) __interrupt(29){
 
       /* Check on EV2*/
     	case 0x0240 :// I2C_EVENT_SLAVE_BYTE_RECEIVED, Receive data from Host
+			switch(I2CRead()){// read CMD
+				
+			case 0xAB: // Sleep command.
+				kbd_flag |= 0x02; // Sleep flag set bit 1 to 1 .
+				break;
+			
+			case 0x69:// Ping, reply back with "magic number".
+				I2CWrite(69);
+				break;
+			
+			default:
+				break;
+			
+			}
 			
       	break;
 
@@ -153,6 +168,12 @@ void main(){
 	__asm__("rim");// enble interrupt
 	
 	while(1){
+		
+		// check for Sleep flag
+		if(kbd_flag & 0x02){
+			kbd_flag &= ~0x02;// reset sleep flag
+			__asm__("wfi");// enter sleep
+		}
 		// scanner select column 
 		PB_ODR |= kb_scanner[scanner_cnt];// PB0-4
 		
@@ -175,21 +196,31 @@ void main(){
 		if(!(PC_IDR & (1 << 6)))// PC6
 			kb_report[report_order++] = row3_right[scanner_cnt];
 		
+		// If there is/are keypress(es), send the report size first.
+		
+		if(report_order){
+			PD_ODR &= ~(1 << INT_PIN);// Host interruption. 
+			I2CWrite(report_order);
+		}
+		
+		// Then send keycode(s).
+		
 		while(report_order){
-			PD_ODR &= ~(1 << INT_PIN);
 			I2CWrite(kb_report[report_order]);
 			report_order--;
 		}
 		
-		PD_ODR |= (1 << INT_PIN);
+		PD_ODR |= (1 << INT_PIN);// Release Interrupt.
+		
+		// increase counter, plus return to 0.
 		
 		scanner_cnt++;
 		if(scanner_cnt > 5)
 			scanner_cnt = 0;
 		
-		PB_ODR = 0;
+		PB_ODR = 0;// reset all GPIOs state.
 
-		delay_ms(1);
+		delay_ms(1);// delay.
 	}
 
 }// main 
