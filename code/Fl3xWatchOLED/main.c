@@ -40,7 +40,7 @@
 /* init commands sequence*/
 
 #define EPW_SETCONT		0x81 // command to set contrast.
-#define EPW_CONT		0xFF // contras value that need to be set. Set to Max.
+#define EPW_CONT		0x48 // contrast value that need to be set. Set to Max.
 
 // DON'T CHANGE THE PARAMETER, THESE PARAMS ARE FIXED BY MANUFACTURER !
 #define EPW_SETVCOM		0xAD // command to set VCOMH.
@@ -162,7 +162,7 @@ void GPIO_init(){
 	ITC_SPR2 |= (3 << 4);// set VECT6SPR (Entire portB interrupt) priority to high.
 	
 	// We need to do the EXTI setup in sequence.
-	EXTI_CR3 = 0x02;// set interrupt sensitivity to detect falling and low (PortB).
+	EXTI_CR3 = 0x02;// set interrupt sensitivity to detect falling edge(PortB).
 	EXTI_CONF1 |= 0x03;// Enable Port B interrupt source.
 	EXTI_CONF2 &= (uint8_t)~0x20;// Port B instead of Port G is used for interrupt generation.
 }
@@ -404,7 +404,6 @@ void watch_Update(){
 			case 0xFB: // Up button is pressed.
 				// Increase value (of that digit).
 				if(menuTrack == 0){
-					
 					// Time Update
 					num2Char[tPosLUT[Xcol-1]]++;
 					
@@ -457,7 +456,7 @@ void watch_Update(){
 						}
 
 						// Month maximum is 12
-						if(num2DMY[3] > '1'){// if it's month 10 11 or 12
+						if(num2DMY[3] == '1'){// if it's month 10 11 or 12
 							if(num2DMY[4] > '2')// Month can't greater than 12.
 								num2DMY[4] = '2';
 						}
@@ -589,8 +588,8 @@ void watch_showMenu(uint8_t menum){
 
 // Watch thingy stuffs handler.
 void watch_handler(){
-	//if(readPin != 0xFF)// if any pin is triggered interrupt
-			EPW_DispOn(true);// turn display on 
+
+	EPW_DispOn(true);// turn display on 
 	watch_showMenu(menuTrack);
 	// start counter for screen timeout.
 	countdown = RTC_TR1;// snapshot of start time.
@@ -636,7 +635,6 @@ void watch_handler(){
 	countdown = 0;
 	
 	// enter sleep mode.
-	// EXTI_SR2 = 0x01;// clear interrupt pending bit of PortB interrupt.
 	EPW_DispOn(false);// turn display of via command then turn of the Boost IC.
 	__asm__("halt");// halt CPU, Now in active halt mode. Only RTC and ITC are running.
 }
