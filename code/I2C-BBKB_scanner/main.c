@@ -42,6 +42,7 @@ const static uint8_t row3_right[5] = {0, 'B', 'N', 'M', 10};// 10 -> Line feed -
 volatile static uint8_t kbd_flag = 0;
 
 #define REMAP_Pin 0x011C 
+#define DEBUG
 
 static void prntf(char *txt){
 	while(*txt)
@@ -82,13 +83,13 @@ void I2CInit() {
     I2C1_CR1 |= (0x00 | 0x01);// i2c mode not SMBus
 	
     I2C1_OARL = (uint8_t)(devID);
-    I2C1_OARH = (uint8_t)((uint8_t)(0x00 | 0x40 ) | (uint8_t)((uint16_t)( (uint16_t)devID &  (uint16_t)0x0300) >> 7)); 
+    I2C1_OARH = (uint8_t)((uint8_t)0x40  | (uint8_t)((uint16_t)( (uint16_t)devID &  (uint16_t)0x0300) >> 7)); 
 
     I2C1_CR2 = (uint8_t)(1 << 2);
 
     I2C1_CR1 |= (1 << 0);// cmd enable
 
-    I2C1_ITR |= (1 << 0) | (1 << 1) | (1 << 2);// enable interrupt (buffer, event an error interrupt)
+    I2C1_ITR |= (1 << 0) | (1 << 1) | (1 << 2);// enable interrupt (buffer, event and error interrupt)
 }
 
 static uint16_t I2CReadStat(){
@@ -156,11 +157,13 @@ void USART1tx_IRQ(void) __interrupt(27){}
 void USART1rx_IRQ(void) __interrupt(28){}
 
 void main(){
-	CLK_CKDIVR = 0x00;
-	//usart_init(9600); // usart using baudrate at 9600
-	//SYSCFG_RMPCR1 &= (uint8_t)((uint8_t)((uint8_t)REMAP_Pin << 4) | (uint8_t)0x0F); //remap the non-exit pin of Tx and Rx of the UFQFPN20 package to the exit one.
-	//SYSCFG_RMPCR1 |= (uint8_t)((uint16_t)REMAP_Pin & (uint16_t)0x00F0);
-	//prntf(" starting BBTB encoder ver 1.0\n");
+	CLK_CKDIVR = 0x00;// Mo CPU clock divider. Now 16MHz.
+#ifdef DEBUG
+	usart_init(9600); // usart using baudrate at 9600
+	usart_Half_init();// Only use TX.
+	SYSCFG_RMPCR1 |= 0x10;// USART remapped to PA2(TX) and PA3(RX).
+	prntf(" starting BBKB ver 1.0\n");
+#endif
 	
 	GPIOinit(); // init all needed GPIOs
 	I2CInit();// init i2c as slave having address 0x65
