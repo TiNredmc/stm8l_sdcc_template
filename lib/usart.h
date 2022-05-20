@@ -17,6 +17,8 @@ void usart_init(uint32_t BAUDRATE);
 
 void usart_IrDA_init();
 
+void usart_Half_init();
+
 void usart_write(uint8_t data);
 
 uint8_t usart_read();

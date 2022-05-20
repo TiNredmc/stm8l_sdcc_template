@@ -32,6 +32,13 @@ void usart_IrDA_init(){
 	USART1_CR5 |= 0x02;
 }
 
+void usart_Half_init(){
+	// Half duplex mode, using single I/O pin
+	USART1_CR5 |= 0x08;
+	(void)USART1_CR5; //clear pending bit (SCEN)
+	USART1_CR5 &= ~(0x02);// clear IREN(1) bit 
+}
+
 void usart_write(uint8_t data) {
     USART1_DR = data;
     while (!(USART1_SR & (1 << USART1_SR_TC)));
