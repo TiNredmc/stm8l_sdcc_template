@@ -75,15 +75,20 @@ void i2c_writePtrAuto(uint8_t *data){// Write single or sequencial byte with aut
 	}
 }
 uint8_t i2c_read(){// Read data
+	I2C1_CR2 |= (1 << I2C1_CR2_ACK);
     while (!i2c_ChkEv(0x0340));// EV7
     return (uint8_t)I2C1_DR;
 }
 
 void i2c_readPtr(uint8_t *data, uint16_t len){
-	while(len--){
+	while(len-- > 1){
+		I2C1_CR2 |= (1 << I2C1_CR2_ACK);
 		while (!i2c_ChkEv(0x0340));// EV7
-		*data ++ = I2C1_DR;
+		*(data++) = I2C1_DR;
 	}
+	while (!i2c_ChkEv(0x0340));// EV7
+	*(data++) = I2C1_DR;
+	I2C1_CR2 &= ~(1 << I2C1_CR2_ACK);
 }
 
 void i2c_write_addr(uint8_t addr) {//request for Write with 7bit address (you need to put 8 bit address, like 0x5A (MLX90614))
