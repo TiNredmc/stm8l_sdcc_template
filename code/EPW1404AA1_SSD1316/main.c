@@ -265,7 +265,7 @@ while(*txtBuf){
 
 void main(){
 	GPIO_init();// GPIO Init
-	i2c_init(0x00, I2C_400K);// I2C at 400KHz
+	i2c_init(0x00, I2C_100K);// I2C at 400KHz
 	
 	// Clean Frame Buffer for Fresh init.
 	EPW_Clear();
