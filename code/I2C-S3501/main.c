@@ -1,5 +1,6 @@
 // Synaptics S3501 Touch controller driver code.
-// Ported by TinLethax 2020/07/26 +7
+// https://hackaday.io/project/184529-reverse-engineering-bb-passport-keyboard
+// Ported by TinLethax 2022/07/26 +7
 #include <stm8l.h>
 #include <i2c.h>
 #include <usart.h>
@@ -29,6 +30,8 @@ int get_char() {
 	return usart_read();
 }
 
+// Save current page
+static uint8_t current_page = 0;
 
 // Address of each function.
 //Page 0
@@ -51,7 +54,7 @@ static uint8_t F12_report_addr = 0;// Store ACTUAL HID data report address of F1
 
 // General purpose array for reading various report (Query, Control, HID data).
 // Share same variable to save RAM
-static uint8_t F12_report[90];
+static uint8_t report[90];
 
 
 /* F12 Query, Yet to decode this
@@ -87,6 +90,8 @@ void s3501_probe(){
 
 // Set page of S3501
 void s3501_setPage(uint8_t page_num){
+	if(page_num != current_page){
+	current_page = page_num;
 	i2c_start();// Generate Start condition
 	
 	i2c_write_addr(S3501_ADDR);// Request write to S3501.
@@ -95,6 +100,7 @@ void s3501_setPage(uint8_t page_num){
 	i2c_write(page_num);// Write upper half which is page number.
 
 	i2c_stop();// Generate stop condition
+	}
 }
 
 // Read data from S3501
@@ -157,6 +163,10 @@ uint8_t s3501_query(){
 				F1A_addr = i;
 				break;
 				
+			/*case 0x54: // Function 0x54
+				F54_addr = i;
+				break;*/
+				
 			default:
 				break;
 			
@@ -217,12 +227,12 @@ uint8_t s3501_query(){
 #endif
 	
 	// Get F12 / 2D touch property 
-	s3501_read(F12_addr, F12_report, 6);// Retrieve Description Table of F12
-	s3501_read(F12_report[2], F12_report, 89);// Read from control register of F12
+	s3501_read(F12_addr, report, 6);// Retrieve Description Table of F12
+	s3501_read(report[2], report, 89);// Read from control register of F12
 	printf("F12 parsing the HID report:\n");
 	
 	// for(uint8_t j = 0; j < 89; j ++){
-		// printf("0x%02X ", F12_report[j]);
+		// printf("0x%02X ", report[j]);
 		// if(j%5 == 4){
 			// printf("\n");
 		// }
@@ -230,17 +240,17 @@ uint8_t s3501_query(){
 	// }
 	// usart_write('\n');
 	
-	uint16_t max_x = (F12_report[1] << 8) | F12_report[0];
-	uint16_t max_y = (F12_report[3] << 8) | F12_report[2];
+	uint16_t max_x = (report[1] << 8) | report[0];
+	uint16_t max_y = (report[3] << 8) | report[2];
 	
-	uint16_t rx_pitch = (F12_report[5] << 8) | F12_report[4]; 
-	uint16_t tx_pitch = (F12_report[7] << 8) | F12_report[6]; 
+	uint16_t rx_pitch = (report[5] << 8) | report[4]; 
+	uint16_t tx_pitch = (report[7] << 8) | report[6]; 
 	
 	printf("Max X :%u Max Y :%u\n", max_x, max_y);
 	
 	// TODO : Find the correct finger report.
 	
-	// switch(F12_report[0] & 0x07){// check bit 0-2 for maximum finger detection.
+	// switch(report[0] & 0x07){// check bit 0-2 for maximum finger detection.
 	// case 0: // 1 finger
 		// F12_maxfinger = 1;
 		// break;
@@ -281,42 +291,55 @@ uint8_t s3501_query(){
 void s3501_HIDreport(){
 	// HID report
 	// Finger 1
-	// F12_report[0] -> Object present (0x01 == Finger)
-	// F12_report[1] -> ABS_X LSB
-	// F12_report[2] -> ABS_X MSB
-	// F12_report[3] -> ABS_Y LSB
-	// F12_report[4] -> ABS_Y MSB
-	// F12_report[5] -> pressure 
-	// F12_report[6] -> ABS_MT_TOUCH_MINOR
-	// F12_report[7] -> ABS_MT_TOUCH_MAJOR
+	// report[0] -> Object present (0x01 == Finger)
+	// report[1] -> ABS_X LSB
+	// report[2] -> ABS_X MSB
+	// report[3] -> ABS_Y LSB
+	// report[4] -> ABS_Y MSB
+	// report[5] -> pressure 
+	// report[6] -> ABS_MT_TOUCH_MINOR
+	// report[7] -> ABS_MT_TOUCH_MAJOR
 
 	// Finger 2
-	// F12_report[8] -> Object present (0x01 == Finger)
-	// F12_report[9] -> ABS_X LSB
-	// F12_report[10] -> ABS_X MSB
-	// F12_report[11] -> ABS_Y LSB
-	// F12_report[12] -> ABS_Y MSB
-	// F12_report[13] -> pressure 
-	// F12_report[14] -> ABS_MT_TOUCH_MINOR
-	// F12_report[15] -> ABS_MT_TOUCH_MAJOR
+	// report[8] -> Object present (0x01 == Finger)
+	// report[9] -> ABS_X LSB
+	// report[10] -> ABS_X MSB
+	// report[11] -> ABS_Y LSB
+	// report[12] -> ABS_Y MSB
+	// report[13] -> pressure 
+	// report[14] -> ABS_MT_TOUCH_MINOR
+	// report[15] -> ABS_MT_TOUCH_MAJOR
 
-	// F12_report[16] to F12_report[85] are all at 0x00
+	// report[16] to report[85] are all at 0x00
 
-	// F12_report[86] -> BTN_TOUCH single finger == 1, 2 fingers == 3
-	// F12_report[87] is 0x00
+	// report[86] -> BTN_TOUCH single finger == 1, 2 fingers == 3
+	// report[87] is 0x00
+	
+	s3501_setPage(0);// Set page 0 to get data from F12.
+	s3501_read(F12_report_addr, report, 88);// Read from Data register of F12
 
-	s3501_read(F12_report_addr, F12_report, 88);// Read from Data register of F12
+	// Raw binary send via uart for playing around with MATLAB.
+	// usart_write(report[1]);
+	// usart_write(report[2]);
+	// usart_write(report[3]);
+	// usart_write(report[4]);
+	// usart_write(report[5]);
+	// usart_write(report[9]);
+	// usart_write(report[10]);
+	// usart_write(report[11]);
+	// usart_write(report[12]);
+	// usart_write(report[13]);
 
-	if(F12_report[0]){
-	printf("Finger 1 :\n");
-	printf("X: %d Y: %d\n", (F12_report[2] << 8) | F12_report[1], (F12_report[4] << 8) | F12_report[3]);
-	printf("Pressure: %d\n", F12_report[5]);
+	if(report[0]){
+	//printf("Finger 1 :\n");
+	printf("X1: %d Y1: %d\n", (report[2] << 8) | report[1], (report[4] << 8) | report[3]);
+	printf("Pressure1: %d\n", report[5]);
 	}
 	
-	if(F12_report[8]){
-	printf("Finger 2 :\n");
-	printf("X: %d Y: %d\n", (F12_report[10] << 8) | F12_report[9], (F12_report[12] << 8) | F12_report[11]);
-	printf("Pressure: %d\n", F12_report[13]);
+	if(report[8]){
+	//printf("Finger 2 :\n");
+	printf("X2: %d Y2: %d\n", (report[10] << 8) | report[9], (report[12] << 8) | report[11]);
+	printf("Pressure2: %d\n", report[13]);
 	}
 }
 
@@ -340,8 +363,7 @@ void main(){
 	uint8_t res = s3501_query();
 	printf("ERROR CODE: %d\n", res);
 	
-	
-	while(1){
+	while(1){// Polling instead of interrupt (Slow down enought for the readable serial print).
 		s3501_HIDreport();
 		delay_ms(500);
 	}
