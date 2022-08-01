@@ -18,7 +18,7 @@
 #define RMI4_F54	0x54 // Test report
 #define RMI4_F55	0x55 // TX, RX configuration
 
-#define KEEP_INFO // Keep query info. Undefine this can save memory
+//#define KEEP_INFO // Keep query info. Undefine this can save memory
 
 int putchar(int c){
 	usart_write(c);
@@ -34,40 +34,25 @@ int get_char() {
 //Page 0
 static uint8_t F01_addr = 0;
 static uint8_t F12_addr = 0;
+//static uint8_t F34_addr = 0;// Firmware stuffs.
+
+// Page 1
+//static uint8_t F54_addr = 0;
 
 // Page 2
 static uint8_t F1A_addr = 0;
+
+// Page 3
+//static uint8_t F55_addr = 0;
 
 // 2D sensor params of F12
 static uint8_t F12_maxfinger = 0;// store maximum finger supported by the chip
 static uint8_t F12_report_addr = 0;// Store ACTUAL HID data report address of F12.
 
-// 88 bytes report according to RMI4 linux.
-static uint8_t F12_report[88];
-// Finger 1
-// F12_report[0] -> Finger 1 present (1/0)
-// F12_report[1] -> ABS_X LSB
-// F12_report[2] -> ABS_X MSB
-// F12_report[3] -> ABS_Y LSB
-// F12_report[4] -> ABS_Y MSB
-// F12_report[5] -> pressure 
-// F12_report[6] -> ABS_MT_TOUCH_MINOR
-// F12_report[7] -> ABS_MT_TOUCH_MAJOR
+// General purpose array for reading various report (Query, Control, HID data).
+// Share same variable to save RAM
+static uint8_t F12_report[90];
 
-// Finger 2
-// F12_report[8] -> Finger 2 present (1/0)
-// F12_report[9] -> ABS_X LSB
-// F12_report[10] -> ABS_X MSB
-// F12_report[11] -> ABS_Y LSB
-// F12_report[12] -> ABS_Y MSB
-// F12_report[13] -> pressure 
-// F12_report[14] -> ABS_MT_TOUCH_MINOR
-// F12_report[15] -> ABS_MT_TOUCH_MAJOR
-
-// F12_report[16] to F12_report[85] are all at 0x00
-
-// F12_report[86] -> BTN_TOUCH single finger == 1, 2 fingers == 3
-// F12_report[87] is 0x00
 
 /* F12 Query, Yet to decode this
 0x11 
@@ -94,7 +79,7 @@ void s3501_probe(){
 	i2c_start();
 	I2C1_DR = (S3501_ADDR << 1) & 0xFE;// send address to I2C.
 	delay_ms(2);
-	if(I2C1_SR1 & 0x02){// if address found, shout out the address.
+	if(I2C1_SR1 & 0x02){// if address found
 		printf("S3501/S3508 found!\n");
 	}
 	i2c_stop();
@@ -157,6 +142,7 @@ uint8_t s3501_query(){
 			printf("Page %d Table %02X\n",p , i);
 			printf("Dump 0x%02X \n", s3501_desc[5]);
 			}
+			
 			switch(s3501_desc[5]){
 			case 0x01: // Function 0x01, RMI device control.
 				F01_addr = i;// save F01 address. 	
@@ -164,6 +150,7 @@ uint8_t s3501_query(){
 				
 			case 0x12: // Function 0x12, 2-D sensor.
 				F12_addr = i;// save F12 address.
+				F12_report_addr = s3501_desc[3];// save the F12 data report address. This will be the actual address that we read from (mine is 0x06).
 				break;
 			
 			case 0x1A: // Function 0x1A
@@ -185,85 +172,103 @@ uint8_t s3501_query(){
 	
 #ifdef KEEP_INFO
 	// Keep query info of F01 
-	static uint8_t F01_data[21] = {0};
+	static uint8_t F01_query[21] = {0};
 	
 	s3501_setPage(0);// Set to Page 0
-	s3501_read(F01_addr, F01_data, 6);// Retrieve Description Table of F01
-	s3501_read(F01_data[0], F01_data, 21);// Read from Query register of F01
+	s3501_read(F01_addr, F01_query, 6);// Retrieve Description Table of F01
+	s3501_read(F01_query[0], F01_query, 21);// Read from Query register of F01
 	
 	printf("F01 Query:\n");
 	
 	for(uint8_t i = 0; i < 21; i ++){
-		printf("0x%02X ", F01_data[i]);
+		printf("0x%02X ", F01_query[i]);
 		if(i%5 == 4){
 			printf("\n");
 		}
 	}
 	usart_write('\n');
-	// F01_data[0] -> manufacturer ID (always 1).
-	// F01_data[1] -> product porperty
-	// F01_data[2] F01_data[3] -> 7bit (0:6) Product info
-	// F01_data[4] -> Date code year 5bit (0:4)
-	// F01_data[5] -> Date code Month 4bit (0:3)
-	// F01_data[6] -> Date code day 5bit (0:4)
-	// F01_data[7] F01_data[8] -> tester id 14bit 
-	// F01_data[9] F01_data[10] -> Serial number 14bit (0:6 and 0:6 combined to 0:13)
-	// F01_data[11] to F01_data[20] -> Product id in 7bit ASCII character 1 to 10
+	// F01_query[0] -> manufacturer ID (always 1).
+	// F01_query[1] -> product porperty
+	// F01_query[2] F01_query[3] -> 7bit (0:6) Product info
+	// F01_query[4] -> Date code year 5bit (0:4)
+	// F01_query[5] -> Date code Month 4bit (0:3)
+	// F01_query[6] -> Date code day 5bit (0:4)
+	// F01_query[7] F01_query[8] -> tester id 14bit 
+	// F01_query[9] F01_query[10] -> Serial number 14bit (0:6 and 0:6 combined to 0:13)
+	// F01_query[11] to F01_query[20] -> Product id in 7bit ASCII character 1 to 10
 	
 	
-	if(F01_data[0] != 1){// check for manufacturer id (always 1)
+	if(F01_query[0] != 1){// check for manufacturer id (always 1)
+		return 5;
+	}
+#else
+	static uint8_t F01_query[6] = {0};
+	
+	s3501_setPage(0);// Set to Page 0
+	s3501_read(F01_addr, F01_query, 6);// Retrieve Description Table of F01
+	s3501_read(F01_query[0], F01_query, 4);// Read from Query register of F01
+
+	if(F01_query[0] != 1){// Check for manufacturer id (always 1)
 		return 5;
 	}
 	
+	printf("Product property: 0x%02X, Product Info: 0x%02X 0x%02X\n", F01_query[1], F01_query[2], F01_query[3]);
+
 #endif
 	
 	// Get F12 / 2D touch property 
-	uint8_t F12_query[89];
-	s3501_read(F12_addr, F12_query, 6);// Retrieve Description Table of F12
-	printf("F12 return : %02X %02X %02X %02X %02X %02X\n", F12_query[0], F12_query[1], F12_query[2], F12_query[3], F12_query[4], F12_query[5]);
-	F12_report_addr = F12_query[3];// save the F12 data report address. This will be the actual address that we read from (mine is 0x06).
-	s3501_read(F12_query[0], F12_query, 89);// Read from Query register of F12
+	s3501_read(F12_addr, F12_report, 6);// Retrieve Description Table of F12
+	s3501_read(F12_report[2], F12_report, 89);// Read from control register of F12
+	printf("F12 parsing the HID report:\n");
 	
-	printf("F12 Query:\n");
+	// for(uint8_t j = 0; j < 89; j ++){
+		// printf("0x%02X ", F12_report[j]);
+		// if(j%5 == 4){
+			// printf("\n");
+		// }
+		
+	// }
+	// usart_write('\n');
 	
-	for(uint8_t j = 0; j < 89; j ++){
-		printf("0x%02X ", F12_query[j]);
-		if(j%5 == 4){
-			printf("\n");
-		}
-		
-	}
-	usart_write('\n');
+	uint16_t max_x = (F12_report[1] << 8) | F12_report[0];
+	uint16_t max_y = (F12_report[3] << 8) | F12_report[2];
 	
-	switch(F12_query[0] & 0x07){// check bit 0-2 for maximum finger detection.
-	case 0: // 1 finger
-		F12_maxfinger = 1;
-		break;
+	uint16_t rx_pitch = (F12_report[5] << 8) | F12_report[4]; 
+	uint16_t tx_pitch = (F12_report[7] << 8) | F12_report[6]; 
 	
-	case 1: // 2 fingers
-		F12_maxfinger = 2;
-		break;
+	printf("Max X :%u Max Y :%u\n", max_x, max_y);
+	
+	// TODO : Find the correct finger report.
+	
+	// switch(F12_report[0] & 0x07){// check bit 0-2 for maximum finger detection.
+	// case 0: // 1 finger
+		// F12_maxfinger = 1;
+		// break;
+	
+	// case 1: // 2 fingers
+		// F12_maxfinger = 2;
+		// break;
 		
-	case 2: // 3 fingers
-		F12_maxfinger = 3;
-		break;
+	// case 2: // 3 fingers
+		// F12_maxfinger = 3;
+		// break;
 		
-	case 3: // 4 fingers
-		F12_maxfinger = 4;
-		break;
+	// case 3: // 4 fingers
+		// F12_maxfinger = 4;
+		// break;
 		
-	case 4: // 5 fingers 
-		F12_maxfinger = 5;
-		break;
+	// case 4: // 5 fingers 
+		// F12_maxfinger = 5;
+		// break;
 		
-	case 5: // 10 fingers
-		F12_maxfinger = 10;
-		break;
+	// case 5: // 10 fingers
+		// F12_maxfinger = 10;
+		// break;
 		
-	default:
-		F12_maxfinger = 1;
-		break;
-	}
+	// default:
+		// F12_maxfinger = 1;
+		// break;
+	// }
 	
 	printf("Supported finger %d\n", F12_maxfinger);
 	
@@ -274,6 +279,32 @@ uint8_t s3501_query(){
 // Get HID report data (X,Y coordinates and other stuffs).
 // Assuming that it has 2 fingers report (I guess).
 void s3501_HIDreport(){
+	// HID report
+	// Finger 1
+	// F12_report[0] -> Object present (0x01 == Finger)
+	// F12_report[1] -> ABS_X LSB
+	// F12_report[2] -> ABS_X MSB
+	// F12_report[3] -> ABS_Y LSB
+	// F12_report[4] -> ABS_Y MSB
+	// F12_report[5] -> pressure 
+	// F12_report[6] -> ABS_MT_TOUCH_MINOR
+	// F12_report[7] -> ABS_MT_TOUCH_MAJOR
+
+	// Finger 2
+	// F12_report[8] -> Object present (0x01 == Finger)
+	// F12_report[9] -> ABS_X LSB
+	// F12_report[10] -> ABS_X MSB
+	// F12_report[11] -> ABS_Y LSB
+	// F12_report[12] -> ABS_Y MSB
+	// F12_report[13] -> pressure 
+	// F12_report[14] -> ABS_MT_TOUCH_MINOR
+	// F12_report[15] -> ABS_MT_TOUCH_MAJOR
+
+	// F12_report[16] to F12_report[85] are all at 0x00
+
+	// F12_report[86] -> BTN_TOUCH single finger == 1, 2 fingers == 3
+	// F12_report[87] is 0x00
+
 	s3501_read(F12_report_addr, F12_report, 88);// Read from Data register of F12
 
 	if(F12_report[0]){
