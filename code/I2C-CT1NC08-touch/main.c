@@ -9,7 +9,7 @@
 #include <string.h>
 
 /* I2C 7bit address of CT1NC08 */
-#define I2C_ADDR	0x54
+#define I2C_ADDR	0x5C
 
 /* R/W reg */
 #define CMD_EEPSET	0x00 // EEPROM and sysetem control related.
@@ -53,12 +53,12 @@ void CT_read(uint8_t addr, uint8_t *data, uint16_t len){
 	
 	i2c_start();// Generate start condition.
 	
-	i2c_write_addr(S3501_ADDR);// Request write to CT1NC08.
+	i2c_write_addr(I2C_ADDR);// Request write to CT1NC08.
 	i2c_write(addr);// Write address to CT1NC08
 	
 	i2c_start();// Regenerate start condition
 	
-	i2c_read_addr(S3501_ADDR);// Request read from CT1NC08.
+	i2c_read_addr(I2C_ADDR);// Request read from CT1NC08.
 	i2c_readPtr(data, len);
 	
 	i2c_stop();// Generate stop condition
@@ -70,7 +70,7 @@ void CT_write(uint8_t addr, uint8_t *data, uint8_t len){
 	
 	i2c_start();// Generate start condition.
 	
-	i2c_write_addr(S3501_ADDR);// Request write to CT1NC08.
+	i2c_write_addr(I2C_ADDR);// Request write to CT1NC08.
 	i2c_write(addr);// Write address to CT1NC08
 	i2c_writePtr(data, len);// Write the rest of data to CT1NC08.
 	
@@ -81,6 +81,46 @@ void CT_write(uint8_t addr, uint8_t *data, uint8_t len){
 void CT_touchRead(){
 	uint8_t BTN_RD = 0;
 	CT_read(CMD_TCHOUT, &BTN_RD, 1);
+	
+	//For some reason. My touch board is not capable of 2 or more button report.
+	// Simple 1-hot to binary converter
+	switch(BTN_RD){
+		case 0x01:
+			BTN_RD = 1;
+			break;
+		
+		case 0x02:
+			BTN_RD = 2;
+			break;
+			
+		case 0x04:
+			BTN_RD = 3;
+			break;
+			
+		case 0x08:
+			BTN_RD = 4;
+			break;
+			
+		case 0x10:
+			BTN_RD = 5;
+			break;
+			
+		case 0x20:// Mine only has 6 buttons 
+			BTN_RD = 6;
+			break;
+		
+		case 0x40:
+			BTN_RD = 7;
+			break;
+			
+		case 0x80:
+			BTN_RD = 8;
+			break;
+			
+		default:
+			BTN_RD = 0;
+			break;
+	}
 	
 	printf("Button read: 0x%02X\n", BTN_RD);
 }
