@@ -181,22 +181,22 @@ void main(){
 		PB_ODR |= kb_scanner[scanner_cnt];// PB0-4
 		
 		// listen on all 6 pins.
-		if(!(PB_IDR & (1 << 5)))// PB5
+		if(!(PB_IDR & (1 << 6)))// PB6
 			kb_report[report_order++] = row1_left[scanner_cnt];
 		
-		if(!(PB_IDR & (1 << 6)))// PB6
+		if(!(PB_IDR & (1 << 5)))// PB5
 			kb_report[report_order++] = row1_right[scanner_cnt];
 		
-		if(!(PB_IDR & (1 << 7)))// PB7
+		if(!(PC_IDR & (1 << 6)))// PC6
 			kb_report[report_order++] = row2_left[scanner_cnt];
 		
-		if(!(PC_IDR & (1 << 4)))// PC4
+		if(!(PC_IDR & (1 << 5)))// PC5
 			kb_report[report_order++] = row2_right[scanner_cnt];
 		
-		if(!(PC_IDR & (1 << 5)))// PC5
+		if(!(PB_IDR & (1 << 7)))// PB7
 			kb_report[report_order++] = row3_left[scanner_cnt];
 		
-		if(!(PC_IDR & (1 << 6)))// PC6
+		if(!(PC_IDR & (1 << 4)))// PC4
 			kb_report[report_order++] = row3_right[scanner_cnt];
 		
 		// If there is/are keypress(es), send the report size first.
@@ -215,7 +215,7 @@ void main(){
 		
 		PD_ODR |= (1 << INT_PIN);// Release Interrupt.
 		
-		// increase counter, plus return to 0.
+		// increase counter, plus return to 0 check.
 		
 		scanner_cnt++;
 		if(scanner_cnt > 5)
