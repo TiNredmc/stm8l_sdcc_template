@@ -122,7 +122,7 @@ void CT_touchRead(){
 			break;
 	}
 	
-	printf("Button read: 0x%02X\n", BTN_RD);
+	printf("Button read: %d\n", BTN_RD);
 }
 
 void main(){
