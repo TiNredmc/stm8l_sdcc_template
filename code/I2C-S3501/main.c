@@ -19,7 +19,7 @@
 #define RMI4_F54	0x54 // Test report
 #define RMI4_F55	0x55 // TX, RX configuration
 
-//#define KEEP_INFO // Keep query info. Undefine this can save memory
+//#define MORE_INFO // Keep query info. Undefine this can save memory
 
 int putchar(int c){
 	usart_write(c);
@@ -181,51 +181,41 @@ uint8_t s3501_query(){
 	if(F12_addr == 0)
 		return 4;
 	
-#ifdef KEEP_INFO
-	// Keep query info of F01 
-	static uint8_t F01_query[21] = {0};
-	
+#ifdef MORE_INFO
 	s3501_setPage(0);// Set to Page 0
-	s3501_read(F01_addr, F01_query, 6);// Retrieve Description Table of F01
-	s3501_read(F01_query[0], F01_query, 21);// Read from Query register of F01
+	s3501_read(F01_addr, report, 6);// Retrieve Description Table of F01
+	s3501_read(report[0], report, 21);// Read from Query register of F01
 	
 	printf("F01 Query:\n");
 	
 	for(uint8_t i = 0; i < 21; i ++){
-		printf("0x%02X ", F01_query[i]);
+		printf("0x%02X ", report[i]);
 		if(i%5 == 4){
 			printf("\n");
 		}
 	}
 	usart_write('\n');
-	// F01_query[0] -> manufacturer ID (always 1).
-	// F01_query[1] -> product porperty
-	// F01_query[2] F01_query[3] -> 7bit (0:6) Product info
-	// F01_query[4] -> Date code year 5bit (0:4)
-	// F01_query[5] -> Date code Month 4bit (0:3)
-	// F01_query[6] -> Date code day 5bit (0:4)
-	// F01_query[7] F01_query[8] -> tester id 14bit 
-	// F01_query[9] F01_query[10] -> Serial number 14bit (0:6 and 0:6 combined to 0:13)
-	// F01_query[11] to F01_query[20] -> Product id in 7bit ASCII character 1 to 10
-	
-	
-	if(F01_query[0] != 1){// check for manufacturer id (always 1)
-		return 5;
-	}
+	// report[0] -> manufacturer ID (always 1).
+	// report[1] -> product porperty
+	// report[2] report[3] -> 7bit (0:6) Product info
+	// report[4] -> Date code year 5bit (0:4)
+	// report[5] -> Date code Month 4bit (0:3)
+	// report[6] -> Date code day 5bit (0:4)
+	// report[7] report[8] -> tester id 14bit 
+	// report[9] F01_query[10] -> Serial number 14bit (0:6 and 0:6 combined to 0:13)
+	// report[11] to report[20] -> Product id in 7bit ASCII character 1 to 10
 #else
-	static uint8_t F01_query[6] = {0};
-	
 	s3501_setPage(0);// Set to Page 0
-	s3501_read(F01_addr, F01_query, 6);// Retrieve Description Table of F01
-	s3501_read(F01_query[0], F01_query, 4);// Read from Query register of F01
-
-	if(F01_query[0] != 1){// Check for manufacturer id (always 1)
-		return 5;
-	}
-	
-	printf("Product property: 0x%02X, Product Info: 0x%02X 0x%02X\n", F01_query[1], F01_query[2], F01_query[3]);
+	s3501_read(F01_addr, report, 6);// Retrieve Description Table of F01
+	s3501_read(report[0], report, 4);// Read from Query register of F01
 
 #endif
+
+	if(report[0] != 1){// Check for manufacturer id (always 1)
+		return 5;
+	}
+	
+	printf("Product property: 0x%02X, Product Info: 0x%02X 0x%02X\n", report[1], report[2], report[3]);
 	
 	// Get F12 / 2D touch property 
 	s3501_read(F12_addr, report, 6);// Retrieve Description Table of F12
