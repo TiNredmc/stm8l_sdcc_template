@@ -1,3 +1,5 @@
+// STM8L RTC example
+// Coded by TinLethax
 #include <stdint.h>
 #include <stdio.h>
 #include <stm8l.h>
@@ -5,7 +7,6 @@
 #include <delay.h>
 #include <usart.h>
 
-uint16_t REMAP_Pin = 0x011C; 
 uint8_t Hour, Min, Sec;
 
 int putchar(int c){
@@ -196,8 +197,7 @@ void RTC_grepDate(uint8_t *rDay, uint8_t *rDate, uint8_t *rMo, uint8_t *rYe){
 void main() {
 	CLK_CKDIVR = 0x00;// No clock Divider, MAX 16MHz
 	usart_init(9600); // usart using baudrate at 9600
-	SYSCFG_RMPCR1 &= (uint8_t)((uint8_t)((uint8_t)REMAP_Pin << 4) | (uint8_t)0x0F); //remap the non-exit pin of Tx and Rx of the UFQFPN20 package to the exit one.
-	SYSCFG_RMPCR1 |= (uint8_t)((uint16_t)REMAP_Pin & (uint16_t)0x00F0);
+	SYSCFG_RMPCR1 |= 0x10;// USART remapped to PA2(TX) and PA3(RX).
 	delay_ms(100);
 	RTC_Init();// init RTC system clock
 	printf(" Starting Lite RTC...\n");

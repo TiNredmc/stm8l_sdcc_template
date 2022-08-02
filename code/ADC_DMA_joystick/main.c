@@ -8,7 +8,6 @@
 #include <usart.h>
 #include <delay.h>
 
-uint16_t REMAP_Pin = 0x011C; 
 
 int putchar(int c){
 	usart_write(c);
@@ -79,9 +78,8 @@ void DMA_init(){
 
 void main() {
 	CLK_CKDIVR = 0x00;// Full 16Mhz, no clock divider
-usart_init(9600); // usart using baudrate at 9600
-SYSCFG_RMPCR1 &= (uint8_t)((uint8_t)((uint8_t)REMAP_Pin << 4) | (uint8_t)0x0F); //remap the non-exit pin of Tx and Rx of the UFQFPN20 package to the exit one.
-SYSCFG_RMPCR1 |= (uint8_t)((uint16_t)REMAP_Pin & (uint16_t)0x00F0);
+	usart_init(9600); // usart using baudrate at 9600
+	SYSCFG_RMPCR1 |= 0x10;// USART remapped to PA2(TX) and PA3(RX).
 
 	ADC_init();
 	DMA_init();
