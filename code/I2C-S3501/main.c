@@ -149,17 +149,18 @@ uint8_t s3501_query(){
 			printf("Dump 0x%02X \n", s3501_desc[5]);
 			}
 			
+			// Detect RMI4 function
 			switch(s3501_desc[5]){
-			case 0x01: // Function 0x01, RMI device control.
+			case RMI4_F01: // Function 0x01, RMI device control.
 				F01_addr = i;// save F01 address. 	
 				break;
 				
-			case 0x12: // Function 0x12, 2-D sensor.
+			case RMI4_F12: // Function 0x12, 2-D sensor.
 				F12_addr = i;// save F12 address.
 				F12_report_addr = s3501_desc[3];// save the F12 data report address. This will be the actual address that we read from (mine is 0x06).
 				break;
 			
-			case 0x1A: // Function 0x1A
+			case RMI4_F1A: // Function 0x1A
 				F1A_addr = i;
 				break;
 				
