@@ -77,9 +77,9 @@ void i2c_writePtrAuto(uint8_t *data){// Write single or sequencial byte with aut
 	}
 }
 uint8_t i2c_read(){// Read data
-	//I2C1_CR2 |= (1 << I2C1_CR2_ACK);
-    while (!i2c_ChkEv(0x0340));// EV7
-	//I2C1_CR2 &= ~(1 << I2C1_CR2_ACK);
+	I2C1_CR2 &= ~(1 << I2C1_CR2_ACK);
+	i2c_stop();
+	while (!i2c_ChkEv(0x0340));// EV7
     return (uint8_t)I2C1_DR;
 }
 
