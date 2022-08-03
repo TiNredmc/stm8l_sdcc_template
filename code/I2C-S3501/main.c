@@ -280,7 +280,10 @@ uint8_t s3501_query(){
 // Get HID report data (X,Y coordinates and other stuffs).
 // Assuming that it has 2 fingers report (I guess).
 void s3501_HIDreport(){
-	// HID report
+	// HID report (Capable upto 10 fingers, But due to the suraface area.  
+	// It doesn't make any sense to report more than 2 fingers but the data is there).
+	// That's why the data report size is 88 bytes, 8*10 + 8 byte.
+	
 	// Finger 1
 	// report[0] -> Object present (0x01 == Finger)
 	// report[1] -> ABS_X LSB
@@ -300,11 +303,16 @@ void s3501_HIDreport(){
 	// report[13] -> pressure 
 	// report[14] -> ABS_MT_TOUCH_MINOR
 	// report[15] -> ABS_MT_TOUCH_MAJOR
+	
+	//.
+	//.
+	//.
+	// Finger 10
 
 	// report[16] to report[85] are all at 0x00
 
 	// report[86] -> BTN_TOUCH single finger == 1, 2 fingers == 3
-	// report[87] is 0x00
+	// report[87] is 0x01
 	
 	s3501_setPage(0);// Set page 0 to get data from F12.
 	s3501_read(F12_report_addr, report, 88);// Read from Data register of F12
@@ -321,6 +329,7 @@ void s3501_HIDreport(){
 	// usart_write(report[12]);
 	// usart_write(report[13]);
 
+	usart_write(0x0c);
 	if(report[0]){
 	//printf("Finger 1 :\n");
 	printf("X1: %d Y1: %d\n", (report[2] << 8) | report[1], (report[4] << 8) | report[3]);
@@ -331,6 +340,24 @@ void s3501_HIDreport(){
 	//printf("Finger 2 :\n");
 	printf("X2: %d Y2: %d\n", (report[10] << 8) | report[9], (report[12] << 8) | report[11]);
 	printf("Pressure2: %d\n", report[13]);
+	}
+	
+	if(report[16]){
+	//printf("Finger 2 :\n");
+	printf("X3: %d Y3: %d\n", (report[18] << 8) | report[17], (report[20] << 8) | report[19]);
+	printf("Pressure3: %d\n", report[21]);
+	}
+	
+	if(report[24]){
+	//printf("Finger 2 :\n");
+	printf("X4: %d Y4: %d\n", (report[26] << 8) | report[25], (report[28] << 8) | report[27]);
+	printf("Pressure4: %d\n", report[29]);
+	}
+	
+	if(report[32]){
+	//printf("Finger 2 :\n");
+	printf("X5: %d Y5: %d\n", (report[34] << 8) | report[33], (report[36] << 8) | report[35]);
+	printf("Pressure5: %d\n", report[37]);
 	}
 }
 
@@ -356,7 +383,7 @@ void main(){
 	
 	while(1){// Polling instead of interrupt (Slow down enought for the readable serial print).
 		s3501_HIDreport();
-		delay_ms(500);
+		delay_ms(200);
 	}
 }
 
