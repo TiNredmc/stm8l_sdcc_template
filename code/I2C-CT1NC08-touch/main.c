@@ -133,15 +133,9 @@ void main(){
 	i2c_init(0x69, I2C_100K);// Set I2C master address to 0x00, I2C speed to 100kHz.
 	printf("CT1NC08 Demo on STM8L by TinLethax\n");
 	delay_ms(100);
-
 	
 	while(1){
 		CT_touchRead();
 		delay_ms(200);
 	}
 }
-
-/* read/write process
-- Set page with s3501_setPage
-- read or write data with s3501_read or s3501_write
-*/
