@@ -332,31 +332,31 @@ void s3501_HIDreport(){
 	usart_write(0x0c);
 	if(report[0]){
 	//printf("Finger 1 :\n");
-	printf("X1: %d Y1: %d\n", (report[2] << 8) | report[1], (report[4] << 8) | report[3]);
+	printf("X1: %d Y1: %d ", (report[2] << 8) | report[1], (report[4] << 8) | report[3]);
 	printf("Pressure1: %d\n", report[5]);
 	}
 	
 	if(report[8]){
 	//printf("Finger 2 :\n");
-	printf("X2: %d Y2: %d\n", (report[10] << 8) | report[9], (report[12] << 8) | report[11]);
+	printf("X2: %d Y2: %d ", (report[10] << 8) | report[9], (report[12] << 8) | report[11]);
 	printf("Pressure2: %d\n", report[13]);
 	}
 	
 	if(report[16]){
 	//printf("Finger 2 :\n");
-	printf("X3: %d Y3: %d\n", (report[18] << 8) | report[17], (report[20] << 8) | report[19]);
+	printf("X3: %d Y3: %d ", (report[18] << 8) | report[17], (report[20] << 8) | report[19]);
 	printf("Pressure3: %d\n", report[21]);
 	}
 	
 	if(report[24]){
 	//printf("Finger 2 :\n");
-	printf("X4: %d Y4: %d\n", (report[26] << 8) | report[25], (report[28] << 8) | report[27]);
+	printf("X4: %d Y4: %d ", (report[26] << 8) | report[25], (report[28] << 8) | report[27]);
 	printf("Pressure4: %d\n", report[29]);
 	}
 	
 	if(report[32]){
 	//printf("Finger 2 :\n");
-	printf("X5: %d Y5: %d\n", (report[34] << 8) | report[33], (report[36] << 8) | report[35]);
+	printf("X5: %d Y5: %d ", (report[34] << 8) | report[33], (report[36] << 8) | report[35]);
 	printf("Pressure5: %d\n", report[37]);
 	}
 }
