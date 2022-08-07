@@ -71,7 +71,7 @@ void I2CInit() {
     I2C1_CCRL = 0x50;
     I2C1_CCRH = 0x00;
 
-    I2C1_CR1 |= (0x00 | 0x01 );// i2c mode not SMBus, No clock stretching
+    I2C1_CR1 |= (0x00 | 0x01);// i2c mode not SMBus
 	
     I2C1_OARL = (devID << 1);
     I2C1_OARH = (1 << 6);
@@ -226,207 +226,196 @@ void main(){
 		// }
 		
 		// Key matrix scanner
-		switch(scanner_fsm){
-			case 0:// Row 1 Left
-				__asm__("bset 0x5007, #6");// PB 6 as output
-				__asm__("bres 0x5005, #6");// Pull PB6 down
-								
-				delay_ms(1);				
-								
-				if(!(PB_IDR & (1 << 0)))
-					kb_report[report_order++] = row1_left[0];
-			
-				if(!(PB_IDR & (1 << 1)))
-					kb_report[report_order++] = row1_left[1];
-				
-				if(!(PB_IDR & (1 << 2)))
-					kb_report[report_order++] = row1_left[2];
-				
-				if(!(PB_IDR & (1 << 3)))
-					kb_report[report_order++] = row1_left[3];
-				
-				if(!(PB_IDR & (1 << 4)))
-					kb_report[report_order++] = row1_left[4];
-				
-				__asm__("bset 0x5005, #6");// Release PB6
-				
-				scanner_fsm = 1;
-			break;
-			
-			case 1:// ROW 1 Right
-				__asm__("bres 0x5007, #6");// PB6 as input Hi-z
-				__asm__("bset 0x5007, #5");// PB5 as output 
-				__asm__("bres 0x5005, #5");// Pull PB5 down
-				
-				delay_ms(1);	
-				
-				if(!(PB_IDR & (1 << 0)))
-					kb_report[report_order++] = row1_right[0];
-			
-				if(!(PB_IDR & (1 << 1)))
-					kb_report[report_order++] = row1_right[1];
-				
-				if(!(PB_IDR & (1 << 2)))
-					kb_report[report_order++] = row1_right[2];
-				
-				if(!(PB_IDR & (1 << 3)))
-					kb_report[report_order++] = row1_right[3];
-				
-				if(!(PB_IDR & (1 << 4)))
-					kb_report[report_order++] = row1_right[4];
-				
-				__asm__("bset 0x5005, #5");// Release PB5
-				
-				scanner_fsm = 2;
-			break;
-			
-			case 2:// ROW 2 Left
-				__asm__("bres 0x5007, #5");// PB5 as input Hi-z
-				__asm__("bset 0x500C, #6");// PC6 as output 
-				__asm__("bres 0x500A, #6");// Pull PC6 down
-				
-				delay_ms(1);
-				
-				if(!(PB_IDR & (1 << 0)))
-					kb_report[report_order++] = row2_left[0];
-			
-				if(!(PB_IDR & (1 << 1)))
-					kb_report[report_order++] = row2_left[1];
-				
-				if(!(PB_IDR & (1 << 2)))
-					kb_report[report_order++] = row2_left[2];
-				
-				if(!(PB_IDR & (1 << 3)))
-					kb_report[report_order++] = row2_left[3];
-				
-				if(!(PB_IDR & (1 << 4)))
-					kb_report[report_order++] = row2_left[4];
-				
-				__asm__("bset 0x500A, #6");// Release PC6
-				
-				scanner_fsm = 3;
-			break;
-			
-			case 3:// ROW 2 Right
-				__asm__("bres 0x500C, #6");// PC6 as input Hi-z
-				__asm__("bset 0x500C, #5");// PC5 as output 
-				__asm__("bres 0x500A, #5");// Pull PC5 down
-				
-				delay_ms(1);
 
-				if(!(PB_IDR & (1 << 0)))
-					kb_report[report_order++] = row2_right[0];
-			
-				if(!(PB_IDR & (1 << 1)))
-					kb_report[report_order++] = row2_right[1];
-				
-				if(!(PB_IDR & (1 << 2)))
-					kb_report[report_order++] = row2_right[2];
-				
-				if(!(PB_IDR & (1 << 3)))
-					kb_report[report_order++] = row2_right[3];
-				
-				if(!(PB_IDR & (1 << 4)))
-					kb_report[report_order++] = row2_right[4];
-				
-				__asm__("bset 0x500A, #5");// Release PC5
-				
-				scanner_fsm = 4;
-			break;
-			
-			case 4:// ROW 3 Left
-				__asm__("bres 0x500C, #5");// PC5 as input Hi-z
-				__asm__("bset 0x5007, #7");// PB7 as output 
-				__asm__("bres 0x5005, #7");// Pull PB7 down
-				
-				delay_ms(1);
-				
-				if(!(PB_IDR & (1 << 0)))
-					kb_report[report_order++] = row3_left[0];
-			
-				if(!(PB_IDR & (1 << 1)))
-					kb_report[report_order++] = row3_left[1];
-				
-				if(!(PB_IDR & (1 << 2)))
-					kb_report[report_order++] = row3_left[2];
-				
-				if(!(PB_IDR & (1 << 3)))
-					kb_report[report_order++] = row3_left[3];
-				
-				if(!(PB_IDR & (1 << 4)))
-					kb_report[report_order++] = row3_left[4];
-				
-				__asm__("bset 0x5005, #7");// Release PB7
-				
-				scanner_fsm = 5;
-			break;
-			
-			case 5:// ROW 3 Right
-				__asm__("bres 0x5007, #7");// PB7 as input Hi-z
-				__asm__("bset 0x500C, #4");// PC4 as output 
-				__asm__("bres 0x500A, #7");// Pull PC4 down
-				
-				delay_ms(1);
-								
-				if(!(PB_IDR & (1 << 0)))
-					kb_report[report_order++] = row3_right[0];
-			
-				if(!(PB_IDR & (1 << 1)))
-					kb_report[report_order++] = row3_right[1];
-				
-				if(!(PB_IDR & (1 << 2)))
-					kb_report[report_order++] = row3_right[2];
-				
-				if(!(PB_IDR & (1 << 3)))
-					kb_report[report_order++] = row3_right[3];
-				
-				if(!(PB_IDR & (1 << 4)))
-					kb_report[report_order++] = row3_right[4];
-				
-				__asm__("bset 0x500A, #4");// Release PC4
-				__asm__("bres 0x500C, #4");// PC4 as input Hi-z
-				
-				scanner_fsm = 0;
-			break;
-			
-		}
+		__asm__("bset 0x5007, #6");// PB 6 as output
+		__asm__("bres 0x5005, #6");// Pull PB6 down
+						
+		delay_ms(1);				
+						
+		if(!(PB_IDR & (1 << 0)))
+			kb_report[report_order++] = row1_left[0];
+	
+		if(!(PB_IDR & (1 << 1)))
+			kb_report[report_order++] = row1_left[1];
+		
+		if(!(PB_IDR & (1 << 2)))
+			kb_report[report_order++] = row1_left[2];
+		
+		if(!(PB_IDR & (1 << 3)))
+			kb_report[report_order++] = row1_left[3];
+		
+		if(!(PB_IDR & (1 << 4)))
+			kb_report[report_order++] = row1_left[4];
+		
+		__asm__("bset 0x5005, #6");// Release PB6
+
+		__asm__("bres 0x5007, #6");// PB6 as input Hi-z
+		__asm__("bset 0x5007, #5");// PB5 as output 
+		__asm__("bres 0x5005, #5");// Pull PB5 down
+		
+		delay_ms(1);	
+		
+		if(!(PB_IDR & (1 << 0)))
+			kb_report[report_order++] = row1_right[0];
+	
+		if(!(PB_IDR & (1 << 1)))
+			kb_report[report_order++] = row1_right[1];
+		
+		if(!(PB_IDR & (1 << 2)))
+			kb_report[report_order++] = row1_right[2];
+		
+		if(!(PB_IDR & (1 << 3)))
+			kb_report[report_order++] = row1_right[3];
+		
+		if(!(PB_IDR & (1 << 4)))
+			kb_report[report_order++] = row1_right[4];
+		
+		__asm__("bset 0x5005, #5");// Release PB5
+		
+		__asm__("bres 0x5007, #5");// PB5 as input Hi-z
+		__asm__("bset 0x500C, #6");// PC6 as output 
+		__asm__("bres 0x500A, #6");// Pull PC6 down
+		
+		delay_ms(1);
+		
+		if(!(PB_IDR & (1 << 0)))
+			kb_report[report_order++] = row2_left[0];
+	
+		if(!(PB_IDR & (1 << 1)))
+			kb_report[report_order++] = row2_left[1];
+		
+		if(!(PB_IDR & (1 << 2)))
+			kb_report[report_order++] = row2_left[2];
+		
+		if(!(PB_IDR & (1 << 3)))
+			kb_report[report_order++] = row2_left[3];
+		
+		if(!(PB_IDR & (1 << 4)))
+			kb_report[report_order++] = row2_left[4];
+		
+		__asm__("bset 0x500A, #6");// Release PC6
+		
+		__asm__("bres 0x500C, #6");// PC6 as input Hi-z
+		__asm__("bset 0x500C, #5");// PC5 as output 
+		__asm__("bres 0x500A, #5");// Pull PC5 down
+		
+		delay_ms(1);
+
+		if(!(PB_IDR & (1 << 0)))
+			kb_report[report_order++] = row2_right[0];
+	
+		if(!(PB_IDR & (1 << 1)))
+			kb_report[report_order++] = row2_right[1];
+		
+		if(!(PB_IDR & (1 << 2)))
+			kb_report[report_order++] = row2_right[2];
+		
+		if(!(PB_IDR & (1 << 3)))
+			kb_report[report_order++] = row2_right[3];
+		
+		if(!(PB_IDR & (1 << 4)))
+			kb_report[report_order++] = row2_right[4];
+		
+		__asm__("bset 0x500A, #5");// Release PC5
+
+		__asm__("bres 0x500C, #5");// PC5 as input Hi-z
+		__asm__("bset 0x5007, #7");// PB7 as output 
+		__asm__("bres 0x5005, #7");// Pull PB7 down
+		
+		delay_ms(1);
+		
+		if(!(PB_IDR & (1 << 0)))
+			kb_report[report_order++] = row3_left[0];
+	
+		if(!(PB_IDR & (1 << 1)))
+			kb_report[report_order++] = row3_left[1];
+		
+		if(!(PB_IDR & (1 << 2)))
+			kb_report[report_order++] = row3_left[2];
+		
+		if(!(PB_IDR & (1 << 3)))
+			kb_report[report_order++] = row3_left[3];
+		
+		if(!(PB_IDR & (1 << 4)))
+			kb_report[report_order++] = row3_left[4];
+		
+		__asm__("bset 0x5005, #7");// Release PB7
+
+		__asm__("bres 0x5007, #7");// PB7 as input Hi-z
+		__asm__("bset 0x500C, #4");// PC4 as output 
+		__asm__("bres 0x500A, #7");// Pull PC4 down
+		
+		delay_ms(1);
+						
+		if(!(PB_IDR & (1 << 0)))
+			kb_report[report_order++] = row3_right[0];
+	
+		if(!(PB_IDR & (1 << 1)))
+			kb_report[report_order++] = row3_right[1];
+		
+		if(!(PB_IDR & (1 << 2)))
+			kb_report[report_order++] = row3_right[2];
+		
+		if(!(PB_IDR & (1 << 3)))
+			kb_report[report_order++] = row3_right[3];
+		
+		if(!(PB_IDR & (1 << 4)))
+			kb_report[report_order++] = row3_right[4];
+		
+		__asm__("bset 0x500A, #4");// Release PC4
+		__asm__("bres 0x500C, #4");// PC4 as input Hi-z
+
+		if((report_order != 0) && (report_fsm == 2))// No need for key null when button is still press on next scan.
+			report_fsm = 1;
 		
 		// Generate hardware interrupt
 		switch(report_fsm){
-			case 0:
-				if(report_order != 0){
+			case 0:// report key Null once at start up.
 #ifdef DEBUG
-					prntf("KEY1!\n");
+				prntf("Init Key NULL\n");
 #endif
-					PD_ODR = 0x00;
-					report_order = 0;
-				}else{
-#ifdef DEBUG
-					prntf("KEY NULL!\n");
-#endif
-					PD_ODR = 0x00;
-					report_order = 0;
-					report_fsm = 1;
-				}
+				kb_report[0] = 0;
+				kb_report[1] = 0;
+				kb_report[2] = 0;
+				kb_report[3] = 0;
+				kb_report[4] = 0;
+				kb_report[5] = 0;
+				PD_ODR = 0x00;// Generate interrupt pull down.
+				report_order = 0;
+				
+				report_fsm = 1;// Next stage Idle. Wait for report_order != 0.
 			break;
 			
-			case 1:
+			case 1:// Report Key when report_order != 0.
 				if(report_order != 0){
 #ifdef DEBUG
-					prntf("KEY 2!\n");
-#endif
-					PD_ODR = 0x00;
-					report_order = 0;
-					report_fsm = 0;
+				prntf("Key Report\n");
+#endif				
+				PD_ODR = 0x00;// Generate interrupt.
+				report_order = 0;
+				report_fsm = 2;
 				}
+				
+			break;
+			
+			case 2:// Report Null key after key release.
+#ifdef DEBUG
+				prntf("Key NULL\n");
+#endif
+				kb_report[0] = 0;
+				kb_report[1] = 0;
+				kb_report[2] = 0;
+				kb_report[3] = 0;
+				kb_report[4] = 0;
+				kb_report[5] = 0;
+				PD_ODR = 0x00;// Generate interrupt pull down.
+				report_order = 0;
+				
+				report_fsm = 1;// Next stage Idle. Wait for report_order != 0.
 			break;
 		}
-		// increase counter, plus return to 0 check.
 		
-		delay_ms(10);// delay.
+		delay_ms(5);// delay.
 	}
 
 }// main 
-/*
-
-*/
