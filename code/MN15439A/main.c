@@ -9,8 +9,8 @@
 
 /* Define your pinout (MUST BE FAST MODE COMPATIBLE !!) 
  * If Changed, You must change the bset and bres inline assembly pin 
- * For example __asm__("bset 0x5005, #3); >> __asm__("BitSet(to1) Px_ODR address, #PinNumer); Logic 1
- * __asm__("bres 0x5005, #3); >> __asm__("BitReset(to0) Px_ODR address, #PinNumer); Logic 0
+ * For example __asm__("bset 0x5005, #3"); >> __asm__("BitSet(to1) Px_ODR address, #PinNumer"); Logic 1
+ * __asm__("bres 0x5005, #3"); >> __asm__("BitReset(to0) Px_ODR address, #PinNumer"); Logic 0
  */
 
 #define BLK 3	// Display blanking on PB3
