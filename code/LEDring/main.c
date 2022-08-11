@@ -13,8 +13,8 @@ uint8_t bar[4] = {0, 1, 3, 7};// number for turning bar on orderly.
 
 // Initialize app Port B GPIO.
 void initLED(){
-    PB_DDR |= 255;
-    PB_CR1 |= 255;
+    PB_DDR = 255;
+    PB_CR1 = 0x0F;
   }
 
 // Init TIM4 for Timer interrupt LED Muxxing.
