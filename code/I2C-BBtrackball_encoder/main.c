@@ -10,8 +10,6 @@
  
 #include <stm8l.h>
 #include <stdint.h>
-#include <stdio.h>
-#include <string.h>
 #include <usart.h>
 #include <delay.h>
 
@@ -27,12 +25,14 @@ volatile static uint8_t RGBstat = 0x00;// RGB led (received from I2C host).
 
 static uint8_t cmd[2];// 1 command byte and 1 setting bytes
 
-uint16_t REMAP_Pin = 0x011C; 
+#define DEBUG
 
+#ifdef DEBUG
 static void prntf(char *txt){
 	while(*txt)
 		usart_write(*txt++);
 }
+#endif
 
 void GPIOinit(){ // GPIO init
 	// For LED pins and Up Down Left Right input 
@@ -43,11 +43,11 @@ void GPIOinit(){ // GPIO init
 	
 	// For interrupt output for host 
 	PC_DDR |= (1 << INT_PIN);// PC4 as output
-	PC_CR1 |= (1 << INT_PIN);// Push-Pull
+	//PC_CR1 |= (1 << INT_PIN);// Push-Pull
 	PC_ODR |= (1 << INT_PIN);// INT is active low, Init with high, bring low when data report needed.
 	
-	PD_DDR &= ~(1 << 0);// PD0 as input for push button of trackball
-	PD_CR1 &= ~(1 <<0);
+	//PD_DDR &= ~(1 << 0);// PD0 as input for push button of trackball
+	//PD_CR1 &= ~(1 <<0);
 	PD_CR2 |= (1 << 0);// PD0 has interrupt too.
 	
 	EXTI_CR1 |= 0x02;// set interrupt for Rise then Fall detection for pin 0 (Used by PD0).
@@ -63,19 +63,19 @@ void I2CInit() {
 	
     I2C1_CR1 &= ~0x01;// cmd disable for i2c configurating
 
-    I2C1_TRISER |= (uint8_t)(17);// Riser time  
+    I2C1_TRISER |= 17;// Rise time  
 
-    I2C1_CCRL = (uint8_t)SCLSpeed;
-    I2C1_CCRH = (uint8_t)((SCLSpeed >> 8) & 0x0F);
+    I2C1_CCRL = 0x50;
+    I2C1_CCRH = 0x00;
 
     I2C1_CR1 |= (0x00 | 0x01);// i2c mode not SMBus
 	
-    I2C1_OARL = (uint8_t)(devID);
-    I2C1_OARH = (uint8_t)((uint8_t)(0x00 | 0x40 ) | (uint8_t)((uint16_t)( (uint16_t)devID &  (uint16_t)0x0300) >> 7)); 
+    I2C1_OARL = devID << 1;
+    I2C1_OARH = 0x40; 
 
-    I2C1_CR2 = (uint8_t)(1 << 2);
+    I2C1_CR2 = 1 << 2;
 
-    I2C1_CR1 |= (1 << 0);// cmd enable
+    I2C1_CR1 |= 1 << 0;// cmd enable
 
     I2C1_ITR |= (1 << 0) | (1 << 1) | (1 << 2);// enable interrupt (buffer, event an error interrupt)
 }
@@ -95,6 +95,7 @@ static uint16_t I2CReadStat(){
 
 uint8_t I2CRead(){
   /* Return the data present in the DR register */
+  while(!(I2C1_SR1 & 0x40));
   return ((uint8_t)I2C1_DR);
 }
 
@@ -110,14 +111,8 @@ void i2cirq(void) __interrupt(29){
 	switch(I2CReadStat()){
 
     	case 0x0202 : //I2C_EVENT_SLAVE_RECEIVER_ADDRESS_MATCHED 
-	//printf("someone calling me!\n");
-      	break;
-
-      /* Check on EV2*/
-    	case 0x0240 :// I2C_EVENT_SLAVE_BYTE_RECEIVED, Receive data from Host
-      	
-			switch (I2CRead()){// receive first byte (command byte) from host 
-			
+				cmd[0] = I2CRead();
+				switch (cmd[0]){// receive first byte (command byte) from host 
 				case CMD_RGB_SET:
 					cmd[1] = I2CRead();
 					PB_ODR = cmd[1] & 0x0F;// write output to control LED.
@@ -125,37 +120,61 @@ void i2cirq(void) __interrupt(29){
 				default:
 					break;
 			}
-			
       	break;
+
+		case 0x0010:// I2C_EVENT_SLAVE_STOP_RECEIVED	
+			I2C1_CR2 |= (1 << I2C1_CR2_ACK);// send ack 
+			
+		break;
+		
+		case 0x0682:// I2C_EVENT_SLAVE_TRANSMITTER_ADDRESS_MATCHED
+			I2C1_DR = report_byte;// report the trackball movement (up down left right) and button press.	
+			
+			report_byte = 0;// reset value to default
+	
+			PC_ODR |= (1 << INT_PIN);// Release interrupt 
+		break;
 
     	default:
 	break;
 	}
+	
+	// Clear Interrupt flag
+	if(I2C1_SR1 & 0x10)
+		I2C1_CR2 = 0x00;
 
 }
 void Port4irq(void) __interrupt(12){
+#ifdef DEBUG
 	prntf("Down\n");
+#endif
 	report_byte = PB_IDR;// read input register.
 	report_byte >>= 4;// shift bit to left 4 times, filter only PD4-7.
 	EXTI_SR1 = 0x10;// clear interrupt pending of pin 4
 }
 
 void Port5irq(void) __interrupt(13){
+#ifdef DEBUG
 	prntf("Up\n");
+#endif
 	report_byte = PB_IDR;// read input register.
 	report_byte >>= 4;// shift bit to left 4 times, filter only PD4-7.
 	EXTI_SR1 = 0x20;// clear interrupt pending of pin 5
 }
 
 void Port6irq(void) __interrupt(14){
+#ifdef DEBUG
 	prntf("right\n");
+#endif
 	report_byte = PB_IDR;// read input register.
 	report_byte >>= 4;// shift bit to left 4 times, filter only PD4-7.
 	EXTI_SR1 = 0x40;// clear interrupt pending of pin 6
 }
 
 void Port7irq(void) __interrupt(15){
+#ifdef DEBUG
 	prntf("left\n");
+#endif
 	report_byte = PB_IDR;// read input register.
 	report_byte >>= 4;// shift bit to left 4 times, filter only PD4-7.
 	EXTI_SR1 = 0x80;// clear interrupt pending of pin 7
@@ -163,7 +182,9 @@ void Port7irq(void) __interrupt(15){
 
 void PDirq(void) __interrupt(8){
 	report_byte |= PD_IDR << 5;// read input register.
+#ifdef DEBUG
 	prntf("PD int!\n");
+#endif
 	EXTI_SR1 = 0x01;// clear interrupt pensing of pin 0
 }
 
@@ -173,28 +194,25 @@ void PDirq(void) __interrupt(8){
 void USART1tx_IRQ(void) __interrupt(27){}
 void USART1rx_IRQ(void) __interrupt(28){}
 
-// Trackball report : send data over I2C to host with Host interrupting 
+// Trackball report : generate interrupt signal
+// Data transmit done in I2C IRQ.
 void TB_report(){
-	__asm__("sim");// pause system wide interrupt for clean TX.
-	PC_ODR &= ~(1 << INT_PIN);// Bring interrupt low.
-	
-	prntf("report time !\n");
-	//I2CWrite(report_byte);// report the trackball movement (up down left right) and button press.
-	
-	// reset value to default
-	report_byte = 0;
-	
-	PC_ODR |= (1 << INT_PIN);// Release interrupt 
-	__asm__("rim");// resume system interrupt.
+	PC_ODR &= ~(1 << INT_PIN);// Bring interrupt low.	
+#ifdef DEBUG
+	prntf("It's report time !\n");
+#endif
 }
 
 void main(){
 	CLK_CKDIVR = 0x00;
+#ifdef DEBUG
 	usart_init(9600); // usart using baudrate at 9600
-	SYSCFG_RMPCR1 &= (uint8_t)((uint8_t)((uint8_t)REMAP_Pin << 4) | (uint8_t)0x0F); //remap the non-exit pin of Tx and Rx of the UFQFPN20 package to the exit one.
-	SYSCFG_RMPCR1 |= (uint8_t)((uint16_t)REMAP_Pin & (uint16_t)0x00F0);
-	prntf(" starting BBTB encoder ver 1.0\n");
-	
+	SYSCFG_RMPCR1 |= 0x10;// USART remapped to PA2(TX) and PA3(RX).
+	usart_write(0x0C);
+	usart_write(0x0C);
+	prntf("starting BBTB encoder ver 1.0\n");
+#endif
+
 	GPIOinit(); // init all needed GPIOs
 	I2CInit();// init i2c as slave having address 0x65
 	PB_ODR |= 0x0F;
@@ -203,9 +221,9 @@ void main(){
 	__asm__("rim");// enble interrupt
 	
 	while(1){
-		if(report_byte){// report_byte != 0, there's data to send !
-		TB_report();
-		delay_ms(1);
+		if(report_byte != 0){// report_byte != 0, there's data to send !
+			TB_report();// Generates interrupt to grab host attention.
+			delay_ms(1);
 		}
 	}
 
