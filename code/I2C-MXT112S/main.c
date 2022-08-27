@@ -15,7 +15,6 @@
 
 /* Register map*/
 
-
 int putchar(int c){
 	usart_write(c);
 	return 0;
@@ -25,34 +24,48 @@ int get_char() {
 	return usart_read();
 }
 
-// Save current page
-uint8_t current_page = 0;
+/* I2C 7bit address of MXT112S */
+#define MXT_ADDR  0x4B
+
+// Interrupt input.
+#define MXT_INT 4// PB4
+
+#define MXT_ID_BLK_SIZ  7// Query ID size of 7 bytes
 
 // Number of elements in the Object Table
 uint8_t num_obj = 0;
 
-// Set page of MXT112S
-void mxt_setPage(uint8_t page_num){
-	if(page_num != current_page){
-	current_page = page_num;
-	i2c_start();// Generate Start condition.
-	
-	i2c_write_addr(MXT_ADDR);// Request write to MXT112S.
-	
-	i2c_write(0xFF);// Write lower half byte which is dummy.
-	i2c_write(page_num);// Write upper half which is page number.
+// Store address of each object.
+uint16_t T5_addr = 0;
+uint16_t T9_addr = 0;
+//uint16_t T100_addr = 0;
 
-	i2c_stop();// Generate stop condition.
-	}
-}
+// Store message size of each object.
+uint8_t T5_msg_size = 0;
+uint8_t T9_msg_size = 0;
+//uint8_t T100_msg_size = 0;
+
+// Store number of report instances of each report.
+uint8_t T9_instances = 0;
+//uint8_t T100_instances = 0;
+
+// Store number of report ID per instance.
+uint16_t T9_report_cnt = 0;
+//uint16_t T100_report_cnt = 0;
+
+// Genral purpose buffer array
+uint8_t MXT_BUF[256];
+
+uint16_t xpos, ypos;
+uint8_t amplitude;
 
 // Read data from MXT112S
-void mxt_read(uint16_t addr, uint8_t *data, uint16_t len){
-	
+void mxt_read(uint16_t addr, uint8_t *data, uint16_t len) {
+
 	i2c_start();// Generate start condition.
 	
 	i2c_write_addr(MXT_ADDR);// Request write to MXT112S.
-	i2c_write((uint8_t)(addr << 8));// Write LSB byte address to MXT112S.
+	i2c_write((uint8_t)(addr >> 8));// Write LSB byte address to MXT112S.
 	i2c_write((uint8_t)addr);// Write MSB byte address to MXT112S.
 	
 	i2c_start();// Regenerate start condition.
@@ -61,40 +74,105 @@ void mxt_read(uint16_t addr, uint8_t *data, uint16_t len){
 	i2c_readPtr(data, len);
 	
 	i2c_stop();// Generate stop condition.
-	
+
 }
 
 // Write data to MXT112S
-void mxt_write(uint16_t addr, uint8_t *data, uint8_t len){
-	
+void mxt_write(uint16_t addr, uint8_t *data, uint8_t len) {
+
 	i2c_start();// Generate start condition.
 	
 	i2c_write_addr(MXT_ADDR);// Request write to MXT112S.
-	i2c_write((uint8_t)(addr << 8));// Write LSB byte address to MXT112S.
+	i2c_write((uint8_t)(addr >> 8));// Write LSB byte address to MXT112S.
 	i2c_write((uint8_t)addr);// Write MSB byte address to MXT112S.
 	
 	i2c_writePtr(data, len);// Write the rest of data to MXT112S.
 	
 	i2c_stop();// Generate stop condition
+
 }
 
 // Query basic informations of MXT112S
-void mxt_identify(){
+void mxt_identify() {
 	uint8_t buf[MXT_ID_BLK_SIZ] = {0};
-	
+
 	mxt_read(0x0000, buf, MXT_ID_BLK_SIZ);
-	
+
 	num_obj = buf[6];// save the object table elements count.
-	
+
 	printf("Family ID 0x%02X\n", buf[0]);
-	printf("Variant ID 0x%02X\n", buf[1]);
-	printf("Version %d.%d\n", (uint8_t)((buf[2]&0xF0) << 4), buf[2] & 0x0F);
-	printf("Build number 0x%02X\n", buf[3]);
-	printf("X channels %d\n", buf[4]);// Expecting 14
-	printf("Y channels %d\n", buf[5]);// Expecting 8
-	printf("OJB table elements count %d\n", buf[6]);
-	
+	printf("Variant ID 0x%02X\n", buf[1]);\
+	printf("Version : %ul.%ul\n", ((buf[2] & 0xF0) << 4), (buf[2] & 0x0F));
+	printf("Build Number : 0x0%02X\n", buf[3]);
+
+	printf("X channels : %d\n", buf[4]);
+	printf("Y channels : %d\n", buf[5]);
+
+	printf("Object table elements count : %d elements\n", buf[6]);
+
+  // maXTouch can have many object. But we specifically looking for T5 A.K.A Message Processor
+  // and T100 A.K.A Multitouch
+  //
+	for (uint8_t i = 0; i < num_obj; i ++) {
+	mxt_read(0x0007, buf, MXT_ID_BLK_SIZ - 1);
+
+	switch (buf[0]) {
+	  case 5:// T5 message processor.
+		printf("Found T5 object\n");
+		T5_addr = (buf[2] << 8) | buf[1];
+		T5_msg_size = buf[3] + 1;
+		break;
+
+	  case 9:// T9 Multi touch (Assuming the maXTouch S series have this instead of T100 from U series).
+		printf("Found T9 object\n");
+		T9_addr = (buf[2] << 8) | buf[1];
+		T9_msg_size = buf[3] + 1;
+		T9_instances = buf[4] + 1;
+		T9_report_cnt = (buf[4] + 1) * buf[5];
+		break;
+
+	//      case 100:// T100 Multi touch
+	//        printf("Found T100 object\n");
+	//        T100_addr = (buf[2] << 8) | buf[1];
+	//        T100_msg_size = buf[3] + 1;
+	//        T100_instances = buf[4] + 1;
+	//        T100_report_cnt = (buf[4] + 1) * buf[5];
+	//        break;
+	}
+
+	}
+
 }
+
+// Report Multi touch from T9 object.
+// But data is read from T5 message object.
+// Since T9 can report Upto 10 fingers. 
+// The report ID can be more than 1 Report ID.
+// Starting from 0x09 (T9 base report ID).
+void mxt_report_t9(){
+	if((PB_IDR & (1 << MXT_INT)) == 0){
+	mxt_read(T5_addr, MXT_BUF, T9_msg_size);
+
+	if(MXT_BUF[0] != 9){// If we didn't get T9 report (check for the T9 report ID).
+	  // Just ignore the interrupt.
+	  return;      
+	}
+
+	// Check status from first byte.
+	if(MXT_BUF[1] & 0x02)// If touch has been suppressed by Grip or Face (imagine put your phone to your ear).
+	 // Just ignore
+	  return;
+
+	// Convert 2 bytes to 16bit uint X and Y position 
+	xpos = (MXT_BUF[0x02] << 4) | ((MXT_BUF[0x04] >> 4) & 0x0F);
+	ypos = (MXT_BUF[0x03] << 4) | (MXT_BUF[0x04] & 0x0F);
+
+	// Check for touch amplitude (Pressure?)
+	if(MXT_BUF[1] & 0x04)
+	  amplitude =  MXT_BUF[0x06];
+	}
+}
+
 
 void main(){
 	usart_init(9600); // usart using baudrate at 9600
@@ -104,7 +182,7 @@ void main(){
 	i2c_init(0x69, I2C_100K);// Set I2C master address to 0x69, I2C speed to 100kHz.
 	printf("MXT112S on STM8L by TinLethax\n");
 	delay_ms(100);
-
+	mxt_identify();
 	
 	while(1){// Polling instead of interrupt (Slow down enought for the readable serial print).
 
