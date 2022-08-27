@@ -97,6 +97,7 @@ static uint16_t I2CReadStat(){
 
 uint8_t I2CRead(){
   /* Return the data present in the DR register */
+  while(!(I2C1_SR1 & 0x40));
   return ((uint8_t)I2C1_DR);
 }
 
@@ -115,10 +116,6 @@ void i2cirq(void) __interrupt(29){
 #ifdef DEBUG
 			prntf("rec addr match\n");
 #endif
-      	break;
-
-      /* Check on EV2*/
-    	case 0x0240 :// I2C_EVENT_SLAVE_BYTE_RECEIVED, Receive data from Host
 			switch(I2CRead()){// read CMD
 				
 			case 0xAB: // Sleep command.
@@ -130,14 +127,13 @@ void i2cirq(void) __interrupt(29){
 			
 			case 0x69:// Ping, reply back with "magic number".
 #ifdef DEBUG			
-				prntf("Got a ping!\n");
+				prntf("Got a ping! Send \"Magic Number\"\n");
 #endif
 				I2C1_DR = 0x69;
 				break;
 			
 			default:
 				break;
-			
 			}
 			
       	break;
@@ -220,10 +216,10 @@ void main(){
 	while(1){
 		
 		// check for Sleep flag
-		// if(kbd_flag & 0x02){
-			// kbd_flag &= ~0x02;// reset sleep flag
-			// __asm__("wfi");// enter sleep
-		// }
+		if(kbd_flag & 0x02){
+			kbd_flag &= ~0x02;// reset sleep flag
+			__asm__("wfi");// enter sleep
+		}
 		
 		// Key matrix scanner
 
