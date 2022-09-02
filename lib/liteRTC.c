@@ -9,6 +9,9 @@
 
 #include <delay.h>
 
+#define RTC_WAKEUP // Use periodic auto wakeup to update the display every 1 minute.
+
+
 static uint8_t ByteToBcd2(uint8_t Value){
   uint8_t bcdhigh = 0;
 
@@ -59,8 +62,18 @@ CLK_PCKENR2 |= (1 << 2);// enable rtc clock
 
 	//set Hour format to 24 hour
 	// RTC_CR1 &= ~(1 << 6);
-	//Direct R/W on the TRs and DRs reg, By setting bit 4 (BYPSHAD) to 1 
-	RTC_CR1 = 0x10;
+	//Direct R/W on the TRs and DRs reg, By setting bit 4 (BYPSHAD) to 1
+#ifdef RTC_WAKEUP	
+	// Using 1 Minutes wake up interrupt for updating Display.
+	RTC_CR1 = 0x10 | 0x04;// Bypass shadown regs, 1Hz wake up clock.
+		
+	RTC_WUTRH = 0x00;
+	RTC_WUTRL = 60;// 60 * 1Hz == Wake up every 1 minute.
+	
+	RTC_CR2 |= 0x44;// Enable Wakeup timer and its interrupt.
+#else
+	RTC_CR1 = 0x10;// Bypass shadow regs.
+#endif
 
 	//set the Prescalers regs
 	RTC_SPRERH = 0x00;
