@@ -83,7 +83,7 @@ const uint8_t byte_rev_table[256] = {
 // 5x3 pixel fonts. Designed by me UwU.
 const uint8_t Num_font[36] =
 {	0x0F, 0x11, 0x1E,// 0
-	0x02, 0x1F, 0x00,// 1
+	0x12, 0x1F, 0x10,// 1
 	0x19, 0x15, 0x17,// 2
 	0x15, 0x15, 0x0F,// 3
 	0x03, 0x04, 0x1F,// 4
@@ -92,7 +92,7 @@ const uint8_t Num_font[36] =
 	0x01, 0x01, 0x1D,// 7
 	0x0B, 0x15, 0x1A,// 8
 	0x07, 0x05, 0x1E, // 9
-	0x00, 0x00, 0x00,// Blank
+	0x00, 0x00, 0x00,// Blank all LED.
 	0x1F, 0x1F, 0x1F// lit all LED.
 };
 
@@ -132,9 +132,9 @@ void tim2_encinit(){
 	uint8_t tmpccmr1 = TIM2_CCMR1;
 	uint8_t tmpccmr2 = TIM2_CCMR2;
 	tmpccmr1 &= ~0x03;
-	tmpccmr1 |= 0xA1;
+	tmpccmr1 |= 0xF1;
 	tmpccmr2 &= ~0x03;
-	tmpccmr2 |= 0xA1;
+	tmpccmr2 |= 0xF1;
 	
 	// set Enacoder polarity detecion (Falling edge detection).
 	TIM2_CCER1 |= 0x22; 
@@ -182,12 +182,55 @@ void cdm102_numrndr(uint8_t digit1, uint8_t digit2, uint8_t digit3, uint8_t digi
 	digit3 *= 3;
 	digit4 *= 3;
 
-	cdm102_tx(0xA2);
-	cdm102_tx_multiple((uint8_t *)(Num_font + digit1), 3);
+	// Command 0xAX and 0xBX explained.
+	
+	// 0xAX -> 1010 00YX
+	// X -> Select Display group 0 - Left, 1 - Right
+	// Y -> Select Color 0 - Green, 1 - Orange
+	// the 0xAX is apply color to entire group.
+	// Each group you either have green or orange color.
+	
+	// Lets say that I want Left display group to have orange color
+	// and Right display group to orage. All the thing I have to do is to
+	// cdm102_tx(0xA0);
+	// Send 6 column data of Left display group.
+	// cdm102_tx(0xA3);
+	// Send 6 column data of Right display group.
+	
+	// 0xBX -> 1011 00YX
+	// X -> Select Display group 0 - Left, 1 - Right
+	// Y -> Select Color 0 - Green, 1 - Orange
+	// Similar to 0xAX but Color can be overlapsed on same group.
+	// Which means that on same group, You can have Green Orange and Yellow mixed in the same group. 
+	// to make this easier to explain. Imagine each 0xBX command as green and orange color filter.
+	// You can overlay them and get combination of two color. Yellow. 
+	// Or you can cut a hole to let single color goes through the hole. Either Green or Orange.
+	
+	// As the code down below is example of 0xBX.
+	// I have to send the pixel data of each group twice (per 2 color).
+	// The one that overlaps will have yellow color. That's the digit number 1.
+	// Other non overlapped digits will either display Green or Orange color.
+	
+	// First digit.
+	cdm102_tx(0xB2);// Orange color channel of left display group.
+	cdm102_tx_multiple((uint8_t *)(Num_font + digit1), 3); // Overlaps
+	cdm102_tx_multiple((Num_font + 30), 3);
+	
+	// Second digit.
+	cdm102_tx(0xB0);// Green color channel of left display group.
+	cdm102_tx_multiple((uint8_t *)(Num_font + digit1), 3); // Overlaps
 	cdm102_tx_multiple((uint8_t *)(Num_font + digit2), 3);
-	cdm102_tx(0xA1);
+	
+	// Thrid digit.
+	cdm102_tx(0xB3);// Orange color channel of right display group.
 	cdm102_tx_multiple((uint8_t *)(Num_font + digit3), 3);
+	cdm102_tx_multiple((Num_font + 30), 3);
+	
+	// Forth digit.
+	cdm102_tx(0xB1);// Green color channel of right display group.
+	cdm102_tx_multiple((Num_font + 30), 3);
 	cdm102_tx_multiple((uint8_t *)(Num_font + digit4), 3);
+	
 }
 
 // Every 1 Minute, RTC will trigger the interrupt controller.
@@ -242,7 +285,7 @@ void watch_Update(){
 			// Sample the Encoder 
 			encoder_cnt = (TIM2_CNTRH << 8) | TIM2_CNTRL; 
 
-			if(encoder_cnt > encoder_prev){// We have increment
+			if(encoder_cnt < encoder_prev){// We have increment
 				countdown = RTC_TR1;// first lap
 				// Move Cursor forward.
 				Xcol++;
@@ -250,7 +293,7 @@ void watch_Update(){
 				if (Xcol > 6)// Cursor never goes beyond 6 (4 digits 1-4 plus 2 digit for seconds).
 					Xcol = 6;
 				
-			}else if(encoder_cnt < encoder_prev){// We have decrement
+			}else if(encoder_cnt > encoder_prev){// We have decrement
 				countdown = RTC_TR1;// first lap
 				// move cursor backward.
 				if (Xcol == 1)// Cursor never goes backward beyond 1.
@@ -277,7 +320,7 @@ void watch_Update(){
 			// Sample the Encoder 
 			encoder_cnt = (TIM2_CNTRH << 8) | TIM2_CNTRL; 
 
-			if(encoder_cnt > encoder_prev){// We have increment
+			if(encoder_cnt < encoder_prev){// We have increment
 				countdown = RTC_TR1;// first lap
 				// Increase value (of that digit).
 				// Time Update
@@ -291,7 +334,7 @@ void watch_Update(){
 				if((digitVal[0] == 2) && (digitVal[1] > 3))// Hour can't greater than 23.
 						digitVal[1] = 3;
 						
-			}else if(encoder_cnt < encoder_prev){// We have decrement
+			}else if(encoder_cnt > encoder_prev){// We have decrement
 				countdown = RTC_TR1;// first lap
 				// Decrease value (of that digit).
 				if(digitVal[Xcol-1] == 0)// never goes below 0 and get rick roll over.
@@ -410,7 +453,7 @@ void main() {
 	__asm__("rim");
 	SPI_Init(FSYS_DIV_4);// 16MHz/16 = 1Mhz SPI clock
 	cdm102_rst(); //reset display for clean init.
-	cdm102_tx(0xDF);
+	cdm102_tx(0xDF);// Put test pattern on the display
 	liteRTC_Init();// Turn LSI on and Initialize RTC
 	delay_ms(1000);
 	Secs = RTC_TR1;
