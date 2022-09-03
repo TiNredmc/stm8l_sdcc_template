@@ -9,6 +9,10 @@
 #include <spi.h>
 #include <liteRTC.h>
 
+#define ENCA	0	// PB0
+#define ENCB	2	// PB2
+#define ENCBTN	1 	// PB1
+
 // Pinout and connection.
 // CDM102      STM8L151F3
 // 1. Load		PC4
@@ -24,11 +28,16 @@
 #define SPI_SEL		PC_ODR &= ~(1 << SPI_CS)
 #define SPI_UNSEL   PC_ODR |= (1 << SPI_CS)
 
+uint16_t encoder_cnt = 0;
+uint16_t encoder_prev = 1;
+
 volatile uint8_t Hrs, Mins, Secs;
 
 #define SCREEN_TIMEOUT	5 // screen timeout 5 secs. since we use .5s counter (1 second counter is counting up 2 times).
 volatile uint8_t countdown = 0;// screen timout keeper.
 volatile uint8_t readPin = 0;
+
+uint16_t blink_cnt = 0;
 
 uint8_t TimeUpdate_lock = 0;
 volatile uint8_t digitVal[6] = {0};
@@ -94,8 +103,9 @@ void GPIO_init(){
 	PC_CR1 |= (1 << SPI_CS) | (1 << SPI_RST);
 	PC_ODR |= (1 << SPI_CS) | (1 << SPI_RST);
 	
-	PB_CR1 |= 0x1F;// PB0-4 as input already, we just need to config it with pull up.
-	PB_CR2 |= 0x1F;// Enable interrupt on PB0-4.
+	PB_CR1 |= (1 << ENCA) | (1 << ENCB) | (1 << ENCBTN);// set all encoder pin to have pull up.
+	PB_CR2 |= (1 << ENCBTN);// Push button as interrupt
+
 	// Enable Port B interrupt.
 	ITC_SPR2 |= (3 << 4);// set VECT6SPR (Entire portB interrupt) priority to high.
 	
@@ -104,6 +114,38 @@ void GPIO_init(){
 	EXTI_CONF1 |= 0x03;// Enable Port B interrupt source.
 	EXTI_CONF2 &= (uint8_t)~0x20;// Port B instead of Port G is used for interrupt generation.
 	
+}
+
+void tim2_encinit(){
+	CLK_PCKENR1 |= 0x01;// Enable TIM2 timer
+	//Timer 2 init 
+	TIM2_ARRH = 0x03;
+	TIM2_ARRL = 0xE7;
+
+	TIM2_PSCR = (uint8_t)4; 
+
+	TIM2_EGR = 0x01;
+
+	// TIME2 capture mode 2 channels.
+	
+	// Set Capture compare 1 and 2 as input.
+	uint8_t tmpccmr1 = TIM2_CCMR1;
+	uint8_t tmpccmr2 = TIM2_CCMR2;
+	tmpccmr1 &= ~0x03;
+	tmpccmr1 |= 0xA1;
+	tmpccmr2 &= ~0x03;
+	tmpccmr2 |= 0xA1;
+	
+	// set Enacoder polarity detecion (Falling edge detection).
+	TIM2_CCER1 |= 0x22; 
+	
+	TIM2_SMCR |= 0x03;// Set encoder mode to 2 channels mode.
+	TIM2_CCMR1 = tmpccmr1;
+	TIM2_CCMR2 = tmpccmr2;
+	
+	
+	//Enable TIM2
+	TIM2_CR1 = 0x01;
 }
 
 void cdm102_rst(){
@@ -170,11 +212,12 @@ void joystick_irq(void) __interrupt(6){
 }
 
 uint8_t Switcher = 0;
+uint8_t enc_fsm = 0 ;
 
 void watch_Update(){
+	uint8_t Xcol = 1;
 	readPin = 0xFF;// reset pin read state
 	cdm102_tx(0xC0);// Display clear
-	uint8_t Xcol = 1;
 	countdown = RTC_TR1;// first lap
 	
 	Secs = RTC_TR1;
@@ -188,23 +231,54 @@ void watch_Update(){
 	digitVal[5] = Secs & 0x0F;
 	
 	while ((RTC_TR1 - countdown) < (SCREEN_TIMEOUT*2)){
-		
-			if(!(readPin & (1 << 0))){// Press Right button
+		// FSM for Rotary Encoder 
+		switch(enc_fsm){
+		case 0: // Encoder select digit
+			if(!(PB_IDR & (1 << ENCBTN))){// If detected key press. Move to next FSM state.
+				while(!(PB_IDR & (1 << ENCBTN)));
+				enc_fsm = 1;
+			}
+			
+			// Sample the Encoder 
+			encoder_cnt = (TIM2_CNTRH << 8) | TIM2_CNTRL; 
+
+			if(encoder_cnt > encoder_prev){// We have increment
+				countdown = RTC_TR1;// first lap
+				// Move Cursor forward.
 				Xcol++;
 					
 				if (Xcol > 6)// Cursor never goes beyond 6 (4 digits 1-4 plus 2 digit for seconds).
 					Xcol = 6;
-			}
-		
-			if(!(readPin & (1 << 2))){// Press Left button
+				
+			}else if(encoder_cnt < encoder_prev){// We have decrement
+				countdown = RTC_TR1;// first lap
 				// move cursor backward.
 				if (Xcol == 1)// Cursor never goes backward beyond 1.
 					break;
 					
 				Xcol--;
+				
 			}
+
+			encoder_prev = encoder_cnt;
 			
-			if(!(readPin & (1 << 4))){// Press Up button
+			
+			break;
+			
+		case 1:
+			if(!(PB_IDR & (1 << ENCBTN))){// If detected key press. Move back to first FSM state.
+				__asm__("sim");// spinlock
+				liteRTC_SetHMSBCD(((digitVal[0]) << 4) | (digitVal[1]), ((digitVal[2]) << 4) | (digitVal[3]), ((digitVal[4]) << 4) | (digitVal[5]));
+				__asm__("rim");// de-spinlock
+				while(!(PB_IDR & (1 << ENCBTN)));
+				enc_fsm = 0;
+			}
+		
+			// Sample the Encoder 
+			encoder_cnt = (TIM2_CNTRH << 8) | TIM2_CNTRL; 
+
+			if(encoder_cnt > encoder_prev){// We have increment
+				countdown = RTC_TR1;// first lap
 				// Increase value (of that digit).
 				// Time Update
 				digitVal[Xcol-1]++;
@@ -216,10 +290,9 @@ void watch_Update(){
 				// Hour maximum is 23
 				if((digitVal[0] == 2) && (digitVal[1] > 3))// Hour can't greater than 23.
 						digitVal[1] = 3;
-				
-			}
-			
-			if(!(readPin & (1 << 1))){// Press Down button
+						
+			}else if(encoder_cnt < encoder_prev){// We have decrement
+				countdown = RTC_TR1;// first lap
 				// Decrease value (of that digit).
 				if(digitVal[Xcol-1] == 0)// never goes below 0 and get rick roll over.
 					break;
@@ -227,95 +300,88 @@ void watch_Update(){
 				
 			}
 
-			if(!(readPin & (1 << 3))){// Press center button
-				// save Time/Date setting.
-				TimeUpdate_lock +=1;
-				if(TimeUpdate_lock == 2){// If pressed 2 times.
-					TimeUpdate_lock = 0;
-					__asm__("sim");// spinlock
-					liteRTC_SetHMSBCD(((digitVal[0]) << 4) | (digitVal[1]), ((digitVal[2]) << 4) | (digitVal[3]), ((digitVal[4]) << 4) | (digitVal[5]));
-					__asm__("rim");// de-spinlock
-					
-					Secs = RTC_TR1;
-					Mins = RTC_TR2;
-					Hrs = RTC_TR3 & 0x3F;
-					cdm102_tx(0xF0);
-					cdm102_numrndr(Hrs >> 4, Hrs & 0x0F,
-								Mins >> 4, Mins & 0x0F);
-					
-					return;// exit the timeUpdate function
-				}
-			}
-					
-		readPin = 0xFF;// reset pin read state
-
-		if(Xcol < 5){
-		
-			switch(Xcol){
-			case 1: //Selecting digit 1
-				Switcher ^= 1;
-				if(Switcher){
-					cdm102_tx(0xE1);
-					cdm102_numrndr(10, digitVal[1],
-							digitVal[2], digitVal[3]);
-				}else{
-					cdm102_tx(0xF0);
-					cdm102_numrndr(digitVal[0], 10,
-							10, 10);
-				}
-				break;
-				
-			case 2:// Selecting digit 2
-				Switcher ^= 1;
-				if(Switcher){
-					cdm102_tx(0xE1);
-					cdm102_numrndr(digitVal[0], 10,
-							digitVal[2], digitVal[3]);
-				}else{
-					cdm102_tx(0xF0);
-					cdm102_numrndr(10, digitVal[1],
-							10, 10);
-				}
-				break;
-				
-			case 3:// Selecting digit 3
-				Switcher ^= 1;
-				if(Switcher){
-					cdm102_tx(0xE1);
-					cdm102_numrndr(digitVal[0], digitVal[1],
-							10, digitVal[3]);
-				}else{
-					cdm102_tx(0xF0);
-					cdm102_numrndr(10, 10,
-							digitVal[2], 10);
-				}
-				break;
-				
-			case 4:// Selecting digit 4
-				Switcher ^= 1;
-				if(Switcher){
-					cdm102_tx(0xE1);
-					cdm102_numrndr(digitVal[0], digitVal[1],
-							digitVal[2], 10);
-				}else{
-					cdm102_tx(0xF0);
-					cdm102_numrndr(10, 10,
-							10, digitVal[3]);
-				}
-				break;
-			default:
-				break;
-			}
-		// Render hour and minute on the CDM102
-			// cdm102_numrndr(digitVal[0], digitVal[1],
-							// digitVal[2], digitVal[3]);
-		}else{
-			cdm102_tx(0xF0);
-			cdm102_numrndr(10, digitVal[4], digitVal[5], 10);
+			encoder_prev = encoder_cnt;
 			
+			break;
+		}
+			
+		blink_cnt++;
+		if(blink_cnt == 640){
+			Switcher ^= 1;
+			blink_cnt = 0;
+		}
+
+		switch(Xcol){
+		case 1: //Selecting digit 1
+			if(Switcher)
+				cdm102_numrndr(digitVal[0], digitVal[1],
+						digitVal[2], digitVal[3]);
+			else
+				cdm102_numrndr(10, digitVal[1],
+						digitVal[2], digitVal[3]);
+						
+			break;
+			
+		case 2:// Selecting digit 2
+			if(Switcher)
+				cdm102_numrndr(digitVal[0], digitVal[1],
+						digitVal[2], digitVal[3]);
+			else
+				cdm102_numrndr(digitVal[0], 10,
+						digitVal[2], digitVal[3]);
+			break;
+			
+		case 3:// Selecting digit 3
+			if(Switcher)
+				cdm102_numrndr(digitVal[0], digitVal[1],
+						digitVal[2], digitVal[3]);
+			else
+				cdm102_numrndr(digitVal[0], digitVal[1],
+						10, digitVal[3]);
+			break;
+			
+		case 4:// Selecting digit 4
+			if(Switcher)
+				cdm102_numrndr(digitVal[0], digitVal[1],
+						digitVal[2], digitVal[3]);
+			else
+				cdm102_numrndr(digitVal[0], digitVal[1],
+						digitVal[2], 10);
+			break;
+			
+		case 5:// Selecting Seconds digit 1
+			if(Switcher)
+				cdm102_numrndr(10, digitVal[4],
+						digitVal[5], 10);
+			else
+				cdm102_numrndr(10, 10,
+						digitVal[5], 10);
+			break;
+			
+		case 6:// Selecting Seconds digit 2
+			if(Switcher)
+				cdm102_numrndr(10, digitVal[4],
+						digitVal[5], 10);
+			else
+				cdm102_numrndr(10, digitVal[4],
+						10, 10);
+			break;
+			
+		default:
+			break;
 		}
 		
+		readPin = 0xFF;
+		//delay_ms(1);
 	}
+
+	
+	Secs = RTC_TR1;
+	Mins = RTC_TR2;
+	Hrs = RTC_TR3 & 0x3F;
+	cdm102_tx(0xF0);
+	cdm102_numrndr(Hrs >> 4, Hrs & 0x0F,
+				Mins >> 4, Mins & 0x0F);
 	
 }
 
@@ -324,7 +390,7 @@ void Clock_handler(){
 	countdown = RTC_TR1;// snapshot of start time.
 	while ((RTC_TR1 - countdown) < SCREEN_TIMEOUT){// find delta for how long does this loop currenty take.
 		
-		if(!(readPin & (1 << 3))){
+		if(!(readPin & (1 << ENCBTN))){
 			TimeUpdate_lock +=1;
 			if(TimeUpdate_lock == 2){// If pressed 2 times.
 				TimeUpdate_lock = 0;// release Time update lock.
@@ -340,6 +406,7 @@ void Clock_handler(){
 void main() {
 	CLK_CKDIVR = 0x00;// Full 16MHz
 	GPIO_init();
+	tim2_encinit();
 	__asm__("rim");
 	SPI_Init(FSYS_DIV_4);// 16MHz/16 = 1Mhz SPI clock
 	cdm102_rst(); //reset display for clean init.
@@ -352,9 +419,18 @@ void main() {
 	cdm102_numrndr(Hrs >> 4, Hrs & 0x0F,
 					Mins >> 4, Mins & 0x0F);
 	readPin = PB_IDR;
+	TimeUpdate_lock = 0;
     while (1) {
-		
 		Clock_handler();
-
     }
+	
+	
 }
+/*
+		encoder_cnt = (TIM2_CNTRH << 8) | TIM2_CNTRL; 
+		if(encoder_cnt != encoder_prev){// We have increment
+				cdm102_numrndr((uint8_t)((encoder_cnt/1000) % 10), (uint8_t)((encoder_cnt/100) % 10), (uint8_t)((encoder_cnt/10) % 10), (uint8_t)(encoder_cnt % 10));
+		}
+		
+		encoder_prev = encoder_cnt;
+*/
