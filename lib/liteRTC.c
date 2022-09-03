@@ -75,10 +75,15 @@ CLK_PCKENR2 |= (1 << 2);// enable rtc clock
 	RTC_CR1 = 0x10;// Bypass shadow regs.
 #endif
 
-	//set the Prescalers regs
-	RTC_SPRERH = 0x00;
-	RTC_SPRERL = 0xFF;
-	RTC_APRER  = 0x7F;	
+	// set the Prescalers regs
+	// Calculation fomular
+	// 1Hz clock (CK_spre) = RTCclock / (APRER + 1)(SPRER + 1)
+	// In this case RTCclock is 38kHz. I use https://www.calculatorsoup.com/calculators/math/factors.php?input=38000&action=solve
+	// to find the suitable match of APRER and SPRER using Factorization method. 
+	
+	RTC_SPRERH = (uint8_t)((500 - 1) >> 8);
+	RTC_SPRERL = (uint8_t)(500 - 1);
+	RTC_APRER  = (uint8_t)(76 - 1);	
 	
 	//exit init mode
 	RTC_ISR1 &= ~(1 << 7);
