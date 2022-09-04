@@ -81,7 +81,7 @@ const uint8_t byte_rev_table[256] = {
 };
 
 // 5x3 pixel fonts. Designed by me UwU.
-const uint8_t Num_font[36] =
+const uint8_t Num_font[48] =
 {	0x0F, 0x11, 0x1E,// 0
 	0x12, 0x1F, 0x10,// 1
 	0x19, 0x15, 0x17,// 2
@@ -93,7 +93,11 @@ const uint8_t Num_font[36] =
 	0x0B, 0x15, 0x1A,// 8
 	0x07, 0x05, 0x1E, // 9
 	0x00, 0x00, 0x00,// Blank all LED.
-	0x1F, 0x1F, 0x1F// lit all LED.
+	0x1F, 0x1F, 0x1F,// lit all LED.
+	0x01, 0x1F, 0x01,// T
+	0x1F, 0x10, 0x10,// L
+	0x1F, 0x04, 0x1F,// H
+	0x1B, 0x04, 0x1B,// X
 };
 
 // Init GPIOs for Joy stock button and CS pin
@@ -142,7 +146,6 @@ void tim2_encinit(){
 	TIM2_SMCR |= 0x03;// Set encoder mode to 2 channels mode.
 	TIM2_CCMR1 = tmpccmr1;
 	TIM2_CCMR2 = tmpccmr2;
-	
 	
 	//Enable TIM2
 	TIM2_CR1 = 0x01;
@@ -213,23 +216,23 @@ void cdm102_numrndr(uint8_t digit1, uint8_t digit2, uint8_t digit3, uint8_t digi
 	
 	// First digit.
 	cdm102_tx(0xB2);// Orange color channel of left display group.
-	cdm102_tx_multiple((uint8_t *)(Num_font + digit1), 3); // Overlaps
-	cdm102_tx_multiple((Num_font + 30), 3);
+	cdm102_tx_multiple(Num_font + digit1, 3); // Overlaps
+	cdm102_tx_multiple(Num_font + 30, 3);
 	
 	// Second digit.
 	cdm102_tx(0xB0);// Green color channel of left display group.
-	cdm102_tx_multiple((uint8_t *)(Num_font + digit1), 3); // Overlaps
-	cdm102_tx_multiple((uint8_t *)(Num_font + digit2), 3);
+	cdm102_tx_multiple(Num_font + digit1, 3); // Overlaps
+	cdm102_tx_multiple(Num_font + digit2, 3);
 	
 	// Thrid digit.
 	cdm102_tx(0xB3);// Orange color channel of right display group.
-	cdm102_tx_multiple((uint8_t *)(Num_font + digit3), 3);
-	cdm102_tx_multiple((Num_font + 30), 3);
+	cdm102_tx_multiple(Num_font + digit3, 3);
+	cdm102_tx_multiple(Num_font + 30, 3);
 	
 	// Forth digit.
 	cdm102_tx(0xB1);// Green color channel of right display group.
-	cdm102_tx_multiple((Num_font + 30), 3);
-	cdm102_tx_multiple((uint8_t *)(Num_font + digit4), 3);
+	cdm102_tx_multiple(Num_font + 30, 3);
+	cdm102_tx_multiple(Num_font + digit4, 3);
 	
 }
 
