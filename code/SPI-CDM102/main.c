@@ -306,8 +306,7 @@ void watch_Update(){
 				
 			}
 
-			encoder_prev = encoder_cnt;
-			
+			encoder_prev = encoder_cnt; 
 			
 			break;
 			
