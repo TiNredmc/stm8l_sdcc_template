@@ -36,21 +36,10 @@ uint16_t obj_addr_cnt = 0;
 uint16_t T5_addr = 0;
 uint16_t T7_addr = 0;
 uint16_t T9_addr = 0;
-//uint16_t T100_addr = 0;
 
-// Store message size of each object.
-uint8_t T5_msg_size = 0;
-uint8_t T7_msg_size = 0;
-uint8_t T9_msg_size = 0;
-//uint8_t T100_msg_size = 0;
-
-// Store number of report instances of each report.
-uint8_t T9_instances = 0;
-//uint8_t T100_instances = 0;
-
-// Store number of report ID per instance.
-uint16_t T9_report_cnt = 0;
-//uint16_t T100_report_cnt = 0;
+// Store min and max report ID of T9
+uint8_t T9_report_id_min = 0;
+uint8_t T9_report_id_max = 0;
 
 // Genral purpose buffer array.
 uint8_t MXT_BUF[256];
@@ -116,15 +105,13 @@ void mxt_identify() {
 	for (uint8_t i = 0; i < num_obj; i ++) {
 	mxt_read(obj_addr_cnt, MXT_BUF, MXT_ID_BLK_SIZ - 1);
 
-//	printf("Object : %d , ID : 0x%02X\n", i, MXT_BUF[0]);
+	printf("Object : %u , ID : %u\n", i, MXT_BUF[0]);
 
 	switch (MXT_BUF[0]) {
 		case 5:// T5 message processor.
 			printf("Found T5 object\n");
 			T5_addr = (MXT_BUF[2] << 8) | MXT_BUF[1];
 			printf("T5 object address : 0x%04X\n", T5_addr);
-			T5_msg_size = MXT_BUF[3] + 1;
-			printf("T5 message size : %u\n", T5_msg_size);
 			break;
 
 		case 7:// T7 power config stuffs.
@@ -136,10 +123,9 @@ void mxt_identify() {
 			printf("Found T9 object\n");
 			T9_addr = (MXT_BUF[2] << 8) | MXT_BUF[1];
 			printf("T9 object address : 0x%04X\n", T9_addr);
-			T9_msg_size = MXT_BUF[3] + 1;
-			T9_instances = MXT_BUF[4] + 1;
-			T9_report_cnt = (MXT_BUF[4] + 1) * MXT_BUF[5];
-			printf("T9 message size : %u\nT9 report count %u\nT9 report IDs : %u\n", T9_msg_size, T9_report_cnt, MXT_BUF[5]);
+			T9_report_id_min = MXT_BUF[5];
+			T9_report_id_max = MXT_BUF[5] + MXT_BUF[4]; 
+			printf("T9 first report ID : 0x%02X\nT9 last report ID : 0x%02X\n", T9_report_id_min, T9_report_id_max);
 			break;
 
 	}
@@ -167,23 +153,37 @@ void mxt_identify() {
 
 // Report Multi touch from T9 object.
 void mxt_report_t9(){
-	mxt_read(T5_addr, MXT_BUF, 16);// 
+	
 	// for(uint8_t i=0; i < 16; i ++){
-		// printf("Dump 1 buf[%u] : 0x%02X\n", i, MXT_BUF[i]);
+		// printf("Dump buf[%u] : 0x%02X\n", i, MXT_BUF[i]);
 	// }
 	
 	if(INT_CHK){
+		//mxt_read(T5_addr, MXT_BUF, 16);// 
+		i2c_start();// Regenerate start condition.
+	
+		i2c_read_addr(MXT_ADDR);// Request read from MXT112S.
+		i2c_readPtr(MXT_BUF, 16);
+		
+		i2c_stop();// Generate stop condition.
+		
 		usart_write(0x0C);
+		//printf("Register dump :\n");
+		//printf("0x%02X 0x%02X 0x%02X 0x%02X 0x%02X 0x%02X 0x%02X 0x%02X\n", MXT_BUF[0], MXT_BUF[1], MXT_BUF[2], MXT_BUF[3], MXT_BUF[4], MXT_BUF[5], MXT_BUF[6], MXT_BUF[7]);
+		// printf("0x%02X 0x%02X 0x%02X 0x%02X 0x%02X 0x%02X 0x%02X 0x%02X\n", MXT_BUF[8], MXT_BUF[9], MXT_BUF[10], MXT_BUF[11], MXT_BUF[12], MXT_BUF[13], MXT_BUF[14], MXT_BUF[15]);
+		// printf("0x%02X 0x%02X 0x%02X 0x%02X 0x%02X 0x%02X 0x%02X 0x%02X\n", MXT_BUF[16], MXT_BUF[17], MXT_BUF[18], MXT_BUF[19], MXT_BUF[20], MXT_BUF[21], MXT_BUF[22], MXT_BUF[23]);
+		// printf("0x%02X 0x%02X 0x%02X 0x%02X 0x%02X 0x%02X 0x%02X 0x%02X\n", MXT_BUF[24], MXT_BUF[25], MXT_BUF[26], MXT_BUF[27], MXT_BUF[28], MXT_BUF[29], MXT_BUF[30], MXT_BUF[31]);
 		
 		// Convert 2 bytes to 16bit uint X and Y position 
-		xpos = (MXT_BUF[0x02 + 8] << 4) | ((MXT_BUF[0x04 + 8] >> 4) & 0x0F);
-		ypos = (MXT_BUF[0x03 + 8] << 4) | (MXT_BUF[0x04 + 8] & 0x0F);
-		
+		xpos = (MXT_BUF[2] << 4) | ((MXT_BUF[4] >> 4) & 0x0F);
+		ypos = (MXT_BUF[3] << 2) | (MXT_BUF[4] & 0x0F);
+		//ypos >>= 2;// quick fix I'm lazy.
+
 		// Check for touch amplitude (Pressure?)
-		if(MXT_BUF[0x01 + 8] & 0x04)
-		  amplitude =  MXT_BUF[0x06 + 8];
+		if(MXT_BUF[1] & 0x04)
+		  amplitude =  MXT_BUF[6];
 		
-		printf("X pos : %d Y pos : %d\n", xpos, ypos);
+		printf("X pos : %u Y pos : %u\n", xpos, ypos);
 		printf("Pressure : %u\n", amplitude);
 
 	}
@@ -198,8 +198,9 @@ void main(){
 	i2c_init(0x69, I2C_100K);// Set I2C master address to 0x69, I2C speed to 100kHz.
 	printf("MXT112S on STM8L by TinLethax\n");
 	PB_CR1 |= 1 << MXT_INT;// Internul pull up on interrupt pin.
-	mxt_identify();
 	delay_ms(100);
+	mxt_identify();
+	mxt_read(T5_addr, MXT_BUF, 16);
 
 	while(1){// Polling instead of interrupt (Slow down enought for the readable serial print).
 		mxt_report_t9();
