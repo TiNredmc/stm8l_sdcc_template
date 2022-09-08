@@ -33,7 +33,7 @@ static uint8_t Bcd2ToByte(uint8_t Value){
 }
 
 void liteRTC_Init(){ // initialize the clock stuff, and Start RTC
-CLK_ICKCR=(1 << CLK_ICKCR_LSION);// turn LowSpeedInternal Clock
+CLK_ICKCR |= (1 << CLK_ICKCR_LSION);// turn LowSpeedInternal Clock
 while (!(CLK_ICKCR & (1 << CLK_ICKCR_LSIRDY)));  // enable LSI oscillator.  
 
 //delay_ms(1000); // wait for the LSI clock to stable 	
