@@ -159,7 +159,6 @@ void mxt_report_t9(){
 	// }
 	
 	if(INT_CHK){
-		//mxt_read(T5_addr, MXT_BUF, 16);// 
 		i2c_start();// Regenerate start condition.
 	
 		i2c_read_addr(MXT_ADDR);// Request read from MXT112S.
@@ -180,7 +179,7 @@ void mxt_report_t9(){
 		//ypos >>= 2;// quick fix I'm lazy.
 
 		// Check for touch amplitude (Pressure?)
-		if(MXT_BUF[1] & 0x04)
+		//if(MXT_BUF[1] & 0x04)
 		  amplitude =  MXT_BUF[6];
 		
 		printf("X pos : %u Y pos : %u\n", xpos, ypos);
