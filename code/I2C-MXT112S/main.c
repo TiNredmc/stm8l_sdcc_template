@@ -8,6 +8,8 @@
 #include <stdio.h>
 #include <string.h>
 
+//#define MATLAB_VISUALIZER
+
 
 int putchar(int c){
 	usart_write(c);
@@ -24,6 +26,10 @@ int get_char() {
 // Interrupt input.
 #define MXT_INT 4// PB4
 #define INT_CHK !(PB_IDR & (1 << MXT_INT))
+
+// Reset pin
+#define MXT_RST 5// PB5
+
 #define MXT_ID_BLK_SIZ  7// Query ID size of 7 bytes
 
 // Number of elements in the Object Table
@@ -36,10 +42,6 @@ uint16_t obj_addr_cnt = 0;
 uint16_t T5_addr = 0;
 uint16_t T7_addr = 0;
 uint16_t T9_addr = 0;
-
-// Store min and max report ID of T9
-uint8_t T9_report_id_min = 0;
-uint8_t T9_report_id_max = 0;
 
 // Genral purpose buffer array.
 uint8_t MXT_BUF[256];
@@ -88,9 +90,9 @@ void mxt_identify() {
 	num_obj = MXT_BUF[6];// save the object table elements count.
 
 	printf("Family ID 0x%02X\n", MXT_BUF[0]);
-	printf("Variant ID 0x%02X\n", MXT_BUF[1]);\
-	printf("Version : %u.%u\n", ((MXT_BUF[2] & 0xF0) << 4), (MXT_BUF[2] & 0x0F));
-	printf("Build Number : 0x0%02X\n", MXT_BUF[3]);
+	printf("Variant ID 0x%02X\n", MXT_BUF[1]);
+	printf("Version : %u.%u\n", ((MXT_BUF[2] & 0xF0) >> 4), (MXT_BUF[2] & 0x0F));
+	printf("Build Number : 0x%02X\n", MXT_BUF[3]);
 
 	printf("X channels : %d\n", MXT_BUF[4]);
 	printf("Y channels : %d\n", MXT_BUF[5]);
@@ -123,9 +125,6 @@ void mxt_identify() {
 			printf("Found T9 object\n");
 			T9_addr = (MXT_BUF[2] << 8) | MXT_BUF[1];
 			printf("T9 object address : 0x%04X\n", T9_addr);
-			T9_report_id_min = MXT_BUF[5];
-			T9_report_id_max = MXT_BUF[5] + MXT_BUF[4]; 
-			printf("T9 first report ID : 0x%02X\nT9 last report ID : 0x%02X\n", T9_report_id_min, T9_report_id_max);
 			break;
 
 	}
@@ -165,14 +164,7 @@ void mxt_report_t9(){
 		i2c_readPtr(MXT_BUF, 16);
 		
 		i2c_stop();// Generate stop condition.
-		
-		usart_write(0x0C);
-		//printf("Register dump :\n");
-		//printf("0x%02X 0x%02X 0x%02X 0x%02X 0x%02X 0x%02X 0x%02X 0x%02X\n", MXT_BUF[0], MXT_BUF[1], MXT_BUF[2], MXT_BUF[3], MXT_BUF[4], MXT_BUF[5], MXT_BUF[6], MXT_BUF[7]);
-		// printf("0x%02X 0x%02X 0x%02X 0x%02X 0x%02X 0x%02X 0x%02X 0x%02X\n", MXT_BUF[8], MXT_BUF[9], MXT_BUF[10], MXT_BUF[11], MXT_BUF[12], MXT_BUF[13], MXT_BUF[14], MXT_BUF[15]);
-		// printf("0x%02X 0x%02X 0x%02X 0x%02X 0x%02X 0x%02X 0x%02X 0x%02X\n", MXT_BUF[16], MXT_BUF[17], MXT_BUF[18], MXT_BUF[19], MXT_BUF[20], MXT_BUF[21], MXT_BUF[22], MXT_BUF[23]);
-		// printf("0x%02X 0x%02X 0x%02X 0x%02X 0x%02X 0x%02X 0x%02X 0x%02X\n", MXT_BUF[24], MXT_BUF[25], MXT_BUF[26], MXT_BUF[27], MXT_BUF[28], MXT_BUF[29], MXT_BUF[30], MXT_BUF[31]);
-		
+
 		// Convert 2 bytes to 16bit uint X and Y position 
 		xpos = (MXT_BUF[2] << 4) | ((MXT_BUF[4] >> 4) & 0x0F);
 		ypos = (MXT_BUF[3] << 2) | (MXT_BUF[4] & 0x0F);
@@ -181,30 +173,46 @@ void mxt_report_t9(){
 		// Check for touch amplitude (Pressure?)
 		//if(MXT_BUF[1] & 0x04)
 		  amplitude =  MXT_BUF[6];
-		
+#ifdef MATLAB_VISUALIZER
+		// Send data packet to PC and plot the data on matlab
+		// packet [Xpos LSB][Xpos MSB][Ypos LSB][Ypos MSB][Amplitude][Zero padding].
+		usart_write((uint8_t)xpos);
+		usart_write((uint8_t)(xpos >> 8));
+		usart_write((uint8_t)ypos);
+		usart_write((uint8_t)(ypos >> 8));
+		usart_write(amplitude);
+		usart_write(0x00);
+#else		
+		usart_write(0x0C);
 		printf("X pos : %u Y pos : %u\n", xpos, ypos);
 		printf("Pressure : %u\n", amplitude);
-
+#endif
 	}
+		
+	
 }
 
-
 void main(){
-	usart_init(57600); // usart using baudrate at 9600
+	usart_init(115200); // usart using baudrate at 115107(actual speed)
 	SYSCFG_RMPCR1 |= 0x10;// USART remapped to PA2(TX) and PA3(RX).
 	usart_write(0x0C);// clear terminal
 	usart_write(0x0C);
 	i2c_init(0x69, I2C_100K);// Set I2C master address to 0x69, I2C speed to 100kHz.
 	printf("MXT112S on STM8L by TinLethax\n");
-	PB_CR1 |= 1 << MXT_INT;// Internul pull up on interrupt pin.
+	PB_DDR |= (1 << MXT_RST);
+	PB_CR1 |= (1 << MXT_INT) | (1 << MXT_RST);// Internul pull up on interrupt pin. And reset pin as push pull
+	
+	PB_ODR |= (1 << MXT_RST);
+	PB_ODR &= ~(1 << MXT_RST);
+	delay_ms(100);
+	PB_ODR |= (1 << MXT_RST);
 	delay_ms(100);
 	mxt_identify();
 	mxt_read(T5_addr, MXT_BUF, 16);
 
 	while(1){// Polling instead of interrupt (Slow down enought for the readable serial print).
 		mxt_report_t9();
-		delay_ms(10);
-		
+		delay_ms(15);
 	}
 }
 
