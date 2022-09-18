@@ -69,6 +69,8 @@ const uint8_t byte_rev_table[256] = {
 	0x1f, 0x9f, 0x5f, 0xdf, 0x3f, 0xbf, 0x7f, 0xff,
 };
 
+uint8_t brightness = 0;
+
 // Frame buffer
 // Single byte contain 4 pixels data
 // Each pixel use 2 bit.
@@ -152,7 +154,7 @@ void cdm101_rndr(){
 	cdm101_tx( (uint8_t)((FB[2] & 0x80) >> 6) | (uint8_t)((FB[6] & 0x80) >> 5) | (uint8_t)((FB[10] & 0x80) >> 4) | (uint8_t)((FB[14] & 0x80) >> 3) | (uint8_t)((FB[11] & 0x02) >> 1));// Col9 + Col16,Row3 Dot
 	cdm101_tx( (uint8_t)((FB[2] & 0x20) >> 4) | (uint8_t)((FB[6] & 0x20) >> 3) | (uint8_t)((FB[10] & 0x20) >> 2) | (uint8_t)((FB[14] & 0x20) >> 1) | (uint8_t)((FB[11] & 0x08) >> 3));// Col10 + Col15,Row3 Dot
 	cdm101_tx( (uint8_t)((FB[2] & 0x08) >> 2) | (uint8_t)((FB[6] & 0x08) >> 1) | (uint8_t)(FB[10] & 0x08) 		 | (uint8_t)((FB[14] & 0x08) << 1) | (uint8_t)((FB[3] & 0x02) >> 1) );// Col11 + Col16,Row1 Dot	
-	cdm101_tx( (uint8_t)(FB[2] & 0x02) 	      | (uint8_t)((FB[6] & 0x02) << 1) | (uint8_t)((FB[10] & 0x02) << 2) | (uint8_t)((FB[14] & 0x02) << 3) | (uint8_t)((FB[3] & 0x02) >> 1) );// Col12 + Col16,Row2 Dot
+	cdm101_tx( (uint8_t)(FB[2] & 0x02) 	      | (uint8_t)((FB[6] & 0x02) << 1) | (uint8_t)((FB[10] & 0x02) << 2) | (uint8_t)((FB[14] & 0x02) << 3) | (uint8_t)((FB[7] & 0x02) >> 1) );// Col12 + Col16,Row2 Dot
 	
 	cdm101_tx( (uint8_t)((FB[3] & 0x80) >> 6) | (uint8_t)((FB[7] & 0x80) >> 5) | (uint8_t)((FB[11] & 0x80) >> 4) | (uint8_t)((FB[15] & 0x80) >> 3) | (uint8_t)((FB[3] & 0x08) >> 3) );// Col13 + Col15,Row1 Dot
 	cdm101_tx( (uint8_t)((FB[3] & 0x20) >> 4) | (uint8_t)((FB[7] & 0x20) >> 3) | (uint8_t)((FB[11] & 0x20) >> 2) | (uint8_t)((FB[15] & 0x20) >> 1) | (uint8_t)((FB[7] & 0x08) >> 3) );// Col14 + Col15,Row2 Dot
@@ -171,8 +173,49 @@ void cdm101_rndr(){
 	
 }
 
-uint8_t cnt = 0;
+void cdm101_fbClear(){
+	for(uint8_t n=0; n < 16; n++)
+		FB[n] = 0;
+	
+}
 
+// Set side bar color
+// 1 -> green
+// 0 -> orange
+void cdm101_sidebarcolor(uint8_t color){
+	color = color ? 8 : 0;
+	cdm101_tx(0xE0 + brightness + color);
+}
+
+uint8_t x_cnt = 0;
+const uint8_t shiftOrange_LUT[4] = {6, 4, 2, 0};
+const uint8_t shiftGreen_LUT[4] = {7, 5, 3, 1};
+uint8_t prev_val = 0;
+void plotter(uint8_t value){
+	uint8_t row_sel = 0;
+	value /= 64;// Down scale from 0-255 to 0-3
+	value = 3 - value;// Invert.
+	value *= 4;// Time 4 to select between Row 1 (0) to Row 4 (3).
+	
+	// Increment + wrap around
+	if(prev_val != value){
+		FB[(x_cnt/4) + value] |= 1 << shiftGreen_LUT[x_cnt%4];
+		prev_val = value;
+		x_cnt++;
+	}
+	
+	if(x_cnt > 15){
+		x_cnt = 0;	
+		//cdm101_tx(0xC0);
+		cdm101_rndr();
+		cdm101_fbClear();
+	}
+		
+	
+}
+
+uint8_t i = 0;
+uint8_t c = 0;
 void main() {
 	CLK_CKDIVR = 0x00;// Full 16MHz
 	usart_init(9600); // usart using baudrate at 9600(actual speed).
@@ -185,28 +228,44 @@ void main() {
 	cdm101_tx(0xDF);// Put test pattern on the display
 	delay_ms(500);
 
-	FB[0] = 0x9E;
-	FB[1] = 0x79;
-	FB[2] = 0xE7;
-	FB[3] = 0x9E;
+	// FB[0] = 0x9E;
+	// FB[1] = 0x79;
+	// FB[2] = 0xE7;
+	// FB[3] = 0x9E;
 	
-	FB[4] = 0x9E;
-	FB[5] = 0x79;
-	FB[6] = 0xE7;
-	FB[7] = 0x9E;
+	// FB[4] = 0x9E;
+	// FB[5] = 0x79;
+	// FB[6] = 0xE7;
+	// FB[7] = 0x9E;
 	
-	FB[8] = 0x9E;
-	FB[9] = 0x79;
-	FB[10] = 0xE7;
-	FB[11] = 0x9E;
+	// FB[8] = 0x9E;
+	// FB[9] = 0x79;
+	// FB[10] = 0xE7;
+	// FB[11] = 0x9E;
 	
-	FB[12] = 0x9E;
-	FB[13] = 0x79;
-	FB[14] = 0xE7;
-	FB[15] = 0x9E;
-	cdm101_rndr();
+	// FB[12] = 0x9E;
+	// FB[13] = 0x79;
+	// FB[14] = 0xE7;
+	// FB[15] = 0x9E;
+	// cdm101_rndr();
+	
+	
     while (1) {
-
+	do{
+		plotter(i);
+		//cdm101_sidebarcolor(c);
+		//c ^= 1;
+		delay_us(100);
+		i++;
+	}while(i);
+	i = 255;
+	while(i){
+		plotter(i--);
+		//cdm101_sidebarcolor(c);
+		//c ^= 1;
+		delay_us(100);
+	}
+	
     }
 	
 	
