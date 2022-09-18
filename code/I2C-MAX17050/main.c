@@ -19,9 +19,19 @@
 #define CMD_REMCAP	0x0F // Remaining Capacity.
 #define CMD_FULLCAP	0x10 // Full capacity.
 #define CMD_CYCLES	0x17 // Battery cycle.
+#define CMD_DEFCAP	0x18 // Designed capacity.
 #define CMD_CONF	0x1D // COnfig register.
 
 #define CMD_VERSION  0x21 // Fuel gauge version
+
+
+// Change according to your battery capacity.
+// Calculation fomular
+// BAT_FULLCAP = Battery capacity (mAh) * sens resistor value (Ohm).
+// Example :
+// BAT_FULLCAP = 500 mAh * 0.010 Ohm <- This code has sens resistor fixed as 10mOhm
+// So BAT_FULLCAP = 5
+#define BAT_FULLCAP 1 // 100mAh battery
 
 int putchar(int c){
 	usart_write(c);
@@ -83,7 +93,7 @@ uint8_t max17050_write_verify_reg(uint8_t reg, uint16_t value){
 }
 
 uint8_t max17050_probe(){
-  uint8_t returnValue = 1;
+	uint8_t returnValue = 1;
 
 	i2c_start();
 	I2C1_DR = (MAX17050_DEV_ADDR << 1) & 0xFE;// send address to I2C.
@@ -93,16 +103,21 @@ uint8_t max17050_probe(){
 	}
 	i2c_stop();
 
-  return returnValue;
+	return returnValue;
 }
 
 uint8_t max17050_init(){
 	// Probe for chip
-  if(max17050_probe())
-	  return 1;
-  // Check device version
-  if(max17050_read_reg(CMD_VERSION) == 0)
-    return 2;
+	if(max17050_probe())
+		return 1;
+	
+	// Check device version
+	if(max17050_read_reg(CMD_VERSION) == 0)
+		return 2;
+
+	// Set the Designed capacity of the battery
+	if(max17050_write_verify_reg(CMD_DEFCAP, (uint16_t)BAT_FULLCAP))
+		return 3;
 
   return 0;
 }
@@ -134,7 +149,8 @@ uint16_t max17050_cycles(){
 
 uint8_t max17050_soc(){
   
-  return (uint8_t)(max17050_read_reg(CMD_SOC) >> 8);
+	return (uint8_t)(max17050_read_reg(CMD_SOC) >> 8);
+	
 }
 
 uint16_t max17050_fullcap(){// Full capacity 
@@ -146,6 +162,7 @@ uint16_t max17050_fullcap(){// Full capacity
 uint16_t max17050_remaincap(){// remain capacity
 	
 	return max17050_read_reg(CMD_REMCAP) / 10000;
+	
 }
 
 void main() {
