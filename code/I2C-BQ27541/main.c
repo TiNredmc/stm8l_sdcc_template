@@ -34,6 +34,14 @@
 #define UNSEAL_KEY1			0x0414
 #define UNSEAL_KEY2			0x3672
 
+// Extended command for accessing Flash memory
+#define EXTCMD_DFClass		0x3E	// Select flash class
+#define EXTCMD_DFBlock		0x3F 	// Select flash block (physical_address / 32)
+#define EXTCMD_BlkData		0x40	// Access entire block data (32 bytes).
+#define EXTCMD_BlkSum		0x60	// Write data checksum to complete block Data update.
+#define EXTCMD_BlkCtrl		0x61	// Block data control (write 0x00 in UNSEALED mode to access flash).
+
+
 int putchar(int c){
 	usart_write(c);
 	return 0;
@@ -50,6 +58,16 @@ void bq27541_write_reg(uint8_t reg, uint16_t value){
 	i2c_write(reg);// Write address to BQ27541.
 	i2c_write((uint8_t)value);
 	i2c_write((uint8_t)(value >> 8));
+	
+	i2c_stop();// Generate stop condition
+}
+
+void bq27541_write_reg8(uint8_t reg, uint8_t value){
+	i2c_start();// Generate start condition.
+	
+	i2c_write_addr(BQ27541_DEV_ADDR);// Request write to BQ27541.
+	i2c_write(reg);// Write address to BQ27541.
+	i2c_write((uint8_t)value);
 	
 	i2c_stop();// Generate stop condition
 }
@@ -111,6 +129,22 @@ uint8_t bq27541_seal(){
 	// Return 1 -> (probably) sill unsealed
 	
 	return (temp & (1 << 13)) ? 0 : 1;// Chec SS (SEALED state) bit.
+}
+
+uint8_t bq27541_check_seal(){
+	uint16_t temp = 0;
+	
+	// check seal status 
+	bq27541_write_reg(CMD_CONTROL, SUB_CONTROLSTAT);// Check control status.
+	
+	temp = bq27541_read_reg(CMD_CONTROL);
+	
+	printf("Control status dumped : 0x%04X", temp);
+	
+	// Return 0 -> Unsealed 
+	// Return 1 -> (probably) still sealed
+	
+	return (temp & (1 << 14)) ? 0 : 1;// Check FAS (Full Access Sealed) bit.
 }
 
 uint8_t bq27541_probe(){
@@ -175,6 +209,72 @@ uint16_t bq27541_fullcap(){// Full capacity in mAh unit
 uint16_t bq27541_remaincap(){// remain capacity in mAh unit
 	
 	return bq27541_read_reg(CMD_RemainCapa);
+	
+}
+
+uint8_t bq27541_open_flash(){
+	
+	if(bq27541_unseal())// Unseal the chip
+		return 1;// return in case of fail UNSEAL
+		
+	bq27541_write_reg8(EXTCMD_BlkCtrl, 0x00);// Unlock flash memory
+	
+	return 0;
+}
+
+uint8_t bq27541_read_flash(uint8_t class_id, uint8_t block_num, uint8_t * buf){
+	
+	if(bq27541_check_seal())
+		return 1;// return 1 in case of SEALED status
+	
+	bq27541_write_reg8(EXTCMD_DFClass, class_id);// Access the specific class.
+	bq27541_write_reg8(EXTCMD_DFBlock, block_num);// Access the specific block.
+	
+	i2c_start();// Generate start condition.
+	
+	i2c_write_addr(BQ27541_DEV_ADDR);// Request write to BQ27541.
+	i2c_write(EXTCMD_BlkData);// Write address to BQ27541.
+	
+	i2c_start();// Regenerate start condition.
+	
+	i2c_read_addr(BQ27541_DEV_ADDR);// Request read from BQ27541.
+	i2c_readPtr(buf, 32);
+	
+	i2c_stop();// Generate stop condition.
+	
+	return 0;
+}
+
+uint8_t bq27541_write_flash(uint8_t class_id, uint8_t block_num, uint8_t * buf){
+	
+	uint8_t chksum = 0;
+	
+	if(bq27541_check_seal())
+		return 1;// return 1 in case of SEALED status
+	
+	// Pre-calculate checksum
+	for(uint8_t n = 0; n < 32; n++)
+		chksum += *(buf + n);// summing
+	
+	chksum -= 255;// complement
+	
+	bq27541_write_reg8(EXTCMD_DFClass, class_id);// Access the specific class.
+	bq27541_write_reg8(EXTCMD_DFBlock, block_num);// Access the specific block.
+
+	/* Write Data to flash*/
+
+	i2c_start();// Generate start condition.
+	
+	i2c_write_addr(BQ27541_DEV_ADDR);// Request write to BQ27541.
+	i2c_write(EXTCMD_BlkData);// Write address to BQ27541.
+	i2c_writePtr(buf, 32);
+	
+	i2c_stop();// Generate stop condition
+	
+	
+	bq27541_write_reg8(EXTCMD_BlkSum, chksum);
+	
+	return 0;
 	
 }
 
