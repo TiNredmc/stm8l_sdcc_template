@@ -7,6 +7,7 @@
 #include <delay.h>
 
 #include <spi.h>
+#define RTC_WAKEUP // Use periodic auto wakeup to update the display every 1 minute.
 #include <liteRTC.h>
 
 #define ENCA	0	// PB0
@@ -136,9 +137,9 @@ void tim2_encinit(){
 	uint8_t tmpccmr1 = TIM2_CCMR1;
 	uint8_t tmpccmr2 = TIM2_CCMR2;
 	tmpccmr1 &= ~0x03;
-	tmpccmr1 |= 0xF1;
+	tmpccmr1 |= 0xD1;
 	tmpccmr2 &= ~0x03;
-	tmpccmr2 |= 0xF1;
+	tmpccmr2 |= 0xD1;
 	
 	// set Enacoder polarity detecion (Falling edge detection).
 	TIM2_CCER1 |= 0x22; 
@@ -146,6 +147,10 @@ void tim2_encinit(){
 	TIM2_SMCR |= 0x03;// Set encoder mode to 2 channels mode.
 	TIM2_CCMR1 = tmpccmr1;
 	TIM2_CCMR2 = tmpccmr2;
+	
+	// set timer counter to the middle, which is 500 (since we have 1000 steps).
+	TIM2_CNTRH = (uint8_t)0x01;
+	TIM2_CNTRL = (uint8_t)0xF4;
 	
 	//Enable TIM2
 	TIM2_CR1 = 0x01;
@@ -203,7 +208,7 @@ void cdm102_numrndr(uint8_t digit1, uint8_t digit2, uint8_t digit3, uint8_t digi
 	// 0xBX -> 1011 00YX
 	// X -> Select Display group 0 - Left, 1 - Right
 	// Y -> Select Color 0 - Green, 1 - Orange
-	// Similar to 0xAX but Color can be overlapsed on same group.
+	// Similar to 0xAX but Color can be overlapped on same group.
 	// Which means that on same group, You can have Green Orange and Yellow mixed in the same group. 
 	// to make this easier to explain. Imagine each 0xBX command as green and orange color filter.
 	// You can overlay them and get combination of two color. Yellow. 
@@ -287,26 +292,28 @@ void watch_Update(){
 			
 			// Sample the Encoder 
 			encoder_cnt = (TIM2_CNTRH << 8) | TIM2_CNTRL; 
-
-			if(encoder_cnt < encoder_prev){// We have increment
-				countdown = RTC_TR1;// first lap
-				// Move Cursor forward.
-				Xcol++;
-					
-				if (Xcol > 6)// Cursor never goes beyond 6 (4 digits 1-4 plus 2 digit for seconds).
-					Xcol = 6;
+			if(encoder_cnt != encoder_prev){
 				
-			}else if(encoder_cnt > encoder_prev){// We have decrement
-				countdown = RTC_TR1;// first lap
-				// move cursor backward.
-				if (Xcol == 1)// Cursor never goes backward beyond 1.
-					break;
+				if(encoder_cnt < encoder_prev){// We have increment
+					countdown = RTC_TR1;// first lap
+					// Move Cursor forward.
+					Xcol++;
+						
+					if (Xcol > 6)// Cursor never goes beyond 6 (4 digits 1-4 plus 2 digit for seconds).
+						Xcol = 6;
 					
-				Xcol--;
-				
+				}else if(encoder_cnt > encoder_prev){// We have decrement
+					countdown = RTC_TR1;// first lap
+					// move cursor backward.
+					if (Xcol == 1)// Cursor never goes backward beyond 1.
+						break;
+						
+					Xcol--;
+					
+				}
+			
+				encoder_prev = encoder_cnt; 
 			}
-
-			encoder_prev = encoder_cnt; 
 			
 			break;
 			
@@ -321,31 +328,34 @@ void watch_Update(){
 		
 			// Sample the Encoder 
 			encoder_cnt = (TIM2_CNTRH << 8) | TIM2_CNTRL; 
+			if(encoder_cnt != encoder_prev){
+				
+				if(encoder_cnt < encoder_prev){// We have increment
+					countdown = RTC_TR1;// first lap
+					// Increase value (of that digit).
+					// Time Update
+					digitVal[Xcol-1]++;
+					
+					// check whether the number is out of bound. 
+					if(digitVal[Xcol-1] > timeMaxVal[Xcol-1])
+						digitVal[Xcol-1] = timeMaxVal[Xcol-1];
+					
+					// Hour maximum is 23
+					if((digitVal[0] == 2) && (digitVal[1] > 3))// Hour can't greater than 23.
+							digitVal[1] = 3;
+							
+				}else if(encoder_cnt > encoder_prev){// We have decrement
+					countdown = RTC_TR1;// first lap
+					// Decrease value (of that digit).
+					if(digitVal[Xcol-1] == 0)// never goes below 0 and get rick roll over.
+						break;
+					digitVal[Xcol-1]--;
+					
+				}
 
-			if(encoder_cnt < encoder_prev){// We have increment
-				countdown = RTC_TR1;// first lap
-				// Increase value (of that digit).
-				// Time Update
-				digitVal[Xcol-1]++;
-				
-				// check whether the number is out of bound. 
-				if(digitVal[Xcol-1] > timeMaxVal[Xcol-1])
-					digitVal[Xcol-1] = timeMaxVal[Xcol-1];
-				
-				// Hour maximum is 23
-				if((digitVal[0] == 2) && (digitVal[1] > 3))// Hour can't greater than 23.
-						digitVal[1] = 3;
-						
-			}else if(encoder_cnt > encoder_prev){// We have decrement
-				countdown = RTC_TR1;// first lap
-				// Decrease value (of that digit).
-				if(digitVal[Xcol-1] == 0)// never goes below 0 and get rick roll over.
-					break;
-				digitVal[Xcol-1]--;
-				
+				encoder_prev = encoder_cnt;
+			
 			}
-
-			encoder_prev = encoder_cnt;
 			
 			break;
 		}
@@ -433,6 +443,7 @@ void watch_Update(){
 void Clock_handler(){
 						
 	countdown = RTC_TR1;// snapshot of start time.
+	encoder_prev = (TIM2_CNTRH << 8) | TIM2_CNTRL;
 	while ((RTC_TR1 - countdown) < SCREEN_TIMEOUT){// find delta for how long does this loop currenty take.
 		
 		if(!(readPin & (1 << ENCBTN))){
