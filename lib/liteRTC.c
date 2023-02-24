@@ -9,8 +9,6 @@
 
 #include <delay.h>
 
-#define RTC_WAKEUP // Use periodic auto wakeup to update the display every 1 minute.
-
 
 static uint8_t ByteToBcd2(uint8_t Value){
   uint8_t bcdhigh = 0;
@@ -81,9 +79,9 @@ CLK_PCKENR2 |= (1 << 2);// enable rtc clock
 	// In this case RTCclock is 38kHz. I use https://www.calculatorsoup.com/calculators/math/factors.php?input=38000&action=solve
 	// to find the suitable match of APRER and SPRER using Factorization method. 
 	
-	RTC_SPRERH = (uint8_t)((500 - 1) >> 8);
-	RTC_SPRERL = (uint8_t)(500 - 1);
-	RTC_APRER  = (uint8_t)(76 - 1);	
+	RTC_SPRERH = (uint8_t)(500 >> 8);
+	RTC_SPRERL = (uint8_t)(500);
+	RTC_APRER  = (uint8_t)(76);	
 	
 	//exit init mode
 	RTC_ISR1 &= ~(1 << 7);
