@@ -21,10 +21,10 @@
 // 3. SCLK		PB5
 // 4. GND		GND
 // 5. SDI		PB6
-// 6. Reset		PC5
+// 6. Reset		PB3
 
 #define SPI_CS	4// PC4 will be used as CS pin
-#define SPI_RST	5// PC5 for display reset.
+#define SPI_RST	3// PB3 for display reset.
 
 #define SPI_SEL		PC_ODR &= ~(1 << SPI_CS)
 #define SPI_UNSEL   PC_ODR |= (1 << SPI_CS)
@@ -104,11 +104,12 @@ const uint8_t Num_font[48] =
 // Init GPIOs for Joy stock button and CS pin
 void GPIO_init(){
 	// Init PC4 as push-pull output and set at High level
-	PC_DDR |= (1 << SPI_CS) | (1 << SPI_RST);
-	PC_CR1 |= (1 << SPI_CS) | (1 << SPI_RST);
-	PC_ODR |= (1 << SPI_CS) | (1 << SPI_RST);
+	PC_DDR |= (1 << SPI_CS);
+	PC_CR1 |= (1 << SPI_CS);
+	PC_ODR |= (1 << SPI_CS);
 	
-	PB_CR1 |= (1 << ENCA) | (1 << ENCB) | (1 << ENCBTN);// set all encoder pin to have pull up.
+	PB_DDR |= (1 << SPI_RST);
+	PB_CR1 |= (1 << ENCA) | (1 << ENCB) | (1 << ENCBTN) | (1 << SPI_RST);// set all encoder pin to have pull up.
 	PB_CR2 |= (1 << ENCBTN);// Push button as interrupt
 
 	// Enable Port B interrupt.
@@ -158,9 +159,9 @@ void tim2_encinit(){
 
 void cdm102_rst(){
 	PC_ODR |= (1 << SPI_RST);
-	PC_ODR &= ~(1 << SPI_RST);
+	PB_ODR &= ~(1 << SPI_RST);
 	delay_ms(100);
-	PC_ODR |= (1 << SPI_RST);
+	PB_ODR |= (1 << SPI_RST);
 }
 
 // Send byte to the CDM102.

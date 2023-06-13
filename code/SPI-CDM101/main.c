@@ -204,6 +204,7 @@ void plotter(uint8_t value){
 		x_cnt++;
 	}
 	
+	
 	if(x_cnt > 15){
 		x_cnt = 0;	
 		//cdm101_tx(0xC0);
@@ -212,6 +213,16 @@ void plotter(uint8_t value){
 	}
 		
 	
+}
+
+void bargraph(uint8_t value, uint8_t color){
+	value /= 64;// Down scale from 0-255 to 0-3.
+	value = 3 - value;// Invert.
+	
+	FB[(xcnt/8)] 		|= 
+	FB[(xcnt/8) + 4] 	|= 
+	FB[(xcnt/8) + 8] 	|= 
+	FB[(xcnt/8) + 12] 	|= 
 }
 
 uint8_t i = 0;
@@ -226,44 +237,23 @@ void main() {
 	SPI_Init(FSYS_DIV_4);// 16MHz/16 = 1Mhz SPI clock
 	cdm101_rst(); //reset display for clean init.
 	cdm101_tx(0xDF);// Put test pattern on the display
-	delay_ms(500);
+	delay_ms(100);
 
-	// FB[0] = 0x9E;
-	// FB[1] = 0x79;
-	// FB[2] = 0xE7;
-	// FB[3] = 0x9E;
-	
-	// FB[4] = 0x9E;
-	// FB[5] = 0x79;
-	// FB[6] = 0xE7;
-	// FB[7] = 0x9E;
-	
-	// FB[8] = 0x9E;
-	// FB[9] = 0x79;
-	// FB[10] = 0xE7;
-	// FB[11] = 0x9E;
-	
-	// FB[12] = 0x9E;
-	// FB[13] = 0x79;
-	// FB[14] = 0xE7;
-	// FB[15] = 0x9E;
-	// cdm101_rndr();
-	
 	
     while (1) {
 	do{
 		plotter(i);
-		//cdm101_sidebarcolor(c);
-		//c ^= 1;
-		delay_us(100);
+		cdm101_sidebarcolor(c);
+		c ^= 1;
+		delay_us(50);
 		i++;
 	}while(i);
 	i = 255;
 	while(i){
 		plotter(i--);
-		//cdm101_sidebarcolor(c);
-		//c ^= 1;
-		delay_us(100);
+		cdm101_sidebarcolor(c);
+		c ^= 1;
+		delay_us(50);
 	}
 	
     }
