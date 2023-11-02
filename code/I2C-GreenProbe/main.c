@@ -120,6 +120,11 @@ void i2cirq(void) __interrupt(29){
 			// In case of Updating LED status.
 			if(i2c_reply == 0xF4){
 				replyF4 = I2CRead();// LED status parameter.
+				i2c_reply = 0;
+				// Recorded data that I have seen so far.
+				// 0x01
+				// 0x81
+				// 0x91
 			}
 			
 		break;
@@ -138,24 +143,25 @@ void i2cirq(void) __interrupt(29){
 			(void)I2C1_SR1;
 			(void)I2C1_SR3;
 			switch(i2c_reply){
-			case 0xE5:
-				I2C1_DR = 0x45;
+			case 0xE5:// Read NVM status
+				I2C1_DR = 0x45;// NVM is locked 
 				i2c_reply = 0;
 				
 				break;
 			
-			case 0xE6:
+			case 0xE6:// Pattern ID (need more investigation).
 				I2C1_DR = 0x69;
+				i2c_reply = 0;
 				
 				break;
 			
-			case 0xE8:
+			case 0xE8:// Read from reserved... (need more investigation).
 				I2C1_DR = 0x52;
 				i2c_reply = 0;
 				
 				break;
 			
-			case 0xD8:
+			case 0xD8:// Read from SLG46582V OTP memory (6 bytes respond)
 				I2C1_DR = replyD8[replycnt];
 				replycnt += 1;
 				if(replycnt == 6){
@@ -165,8 +171,8 @@ void i2cirq(void) __interrupt(29){
 				
 				break;
 			
-			case 0xF4:
-				I2C1_DR = replyF4;
+			case 0xF4:// set virtual input to toggle something inside SLG46582V.
+				I2C1_DR = replyF4;// Register read-back capability.
 				i2c_reply = 0;
 				
 				break;
@@ -211,14 +217,19 @@ void main(){
 			if(current_pin_stat == 1){
 				//De-init I2C
 				__asm__("sim");
-				PB_ODR |= (1 << 2);// Enable I2C gate to Target GreenPAK
-				I2C1_CR1 &= ~(1 << 0);
+				// Enable I2C gate to Target GreenPAK
+				__asm__("bset 0x5005, #2");
+				//PB_ODR |= (1 << 2);
+				__asm__("bres 0x5210, #0");
+				//I2C1_CR1 &= ~(1 << 0);
 				__asm__("rim");
 				
 			}else{
 				//Re-init I2C
 				__asm__("sim");
-				PB_ODR &= ~(1 << 2);// Disable I2C gate to Target GreenPAK
+				// Disable I2C gate to Target GreenPAK
+				__asm__("bres 0x5005, #2");
+				//PB_ODR &= ~(1 << 2);
 				I2CInit();
 				__asm__("rim");
 				
