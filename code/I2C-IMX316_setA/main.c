@@ -56,7 +56,6 @@ void imx_write_reg(uint16_t addr, uint8_t data) {
 
 uint8_t laser_on_flag = 0xAA;
 void imx_set_laser_ctrl(uint8_t laser_on){
-	
 	if(laser_on == 0){
 		laser_on_flag = 0xAA;
 		
@@ -94,13 +93,11 @@ void imx_set_laser_current(uint8_t current_val){
 	
 }
 
-void imx_set_auto_exposure(uint16_t exposure){
-	uint32_t exposure_set;
-	if(exposure < 7 || exposure > 1000)
-		return;
+void imx_get_laser_current(){
 	
-	exposure_set = 120 * exposure;
-	
+}
+
+void imx_set_exposure(uint32_t exposure_set){	
 	// integ_clk
 	imx_write_reg(0x2110, (uint8_t)(exposure_set >> 24));
 	imx_write_reg(0x2111, (uint8_t)(exposure_set >> 16));
@@ -134,11 +131,11 @@ void imx_set_init(){
 #define FPS_10	6
 #define FPS_5	8
 const static uint8_t fps_lut[10]={
-	0x03, 0x68,	
-	0x08, 0x7E,
-	0x92, 0x0D,
-	0x17, 0xBC,
-	0x36, 0x3C
+	0x03, 0x68,	// 30 FPS
+	0x08, 0x7E, // 20 FPS
+	0x0D, 0x92, // 15 FPS
+	0x17, 0xBC, // 10 FPS
+	0x36, 0x3C  // 5 FPS
 };
 
 void imx_set_fps(uint8_t fps){
@@ -175,11 +172,11 @@ void main(){
 	printf("IMX316 Set file A on STM8L by TinLethax\n");
 
 	imx_set_init();
-	imx_set_laser_current(127);
+	imx_set_laser_current(1);
 	imx_set_laser_ctrl(1);
-	imx_set_fps(FPS_5);
+	imx_set_fps(FPS_30);
 	imx_set_stream(1);
-	
+	imx_set_exposure(12000);
 	printf("Done!\n");
 	
 	while(1){
