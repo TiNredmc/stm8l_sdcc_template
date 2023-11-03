@@ -9,7 +9,7 @@
 
 #include <delay.h>
 
-
+#define RTC_WAKEUP // Use periodic auto wakeup to update the display every 1 minute.
 static uint8_t ByteToBcd2(uint8_t Value){
   uint8_t bcdhigh = 0;
 
@@ -31,12 +31,20 @@ static uint8_t Bcd2ToByte(uint8_t Value){
 }
 
 void liteRTC_Init(){ // initialize the clock stuff, and Start RTC
-CLK_ICKCR |= (1 << CLK_ICKCR_LSION);// turn LowSpeedInternal Clock
-while (!(CLK_ICKCR & (1 << CLK_ICKCR_LSIRDY)));  // enable LSI oscillator.  
 
+#ifdef LSI
+CLK_ICKCR |= (1 << CLK_ICKCR_LSION);// turn LowSpeedInternal Clock
+while (!(CLK_ICKCR & (1 << CLK_ICKCR_LSIRDY)));  // enable LSI oscillator.
+CLK_CRTCR = 0x04; //set the RTC clock to LSI clock and set the divider at 1   
+#else
+#warning "Now using LSE"
+CLK_ECKCR |= (1 << 2);
+while (!(CLK_ICKCR & (1 << 3))); // wait until LSE is ready
+CLK_CRTCR = 0x10; //set the RTC clock to LSE clock and set the divider at 1 
+#endif
 //delay_ms(1000); // wait for the LSI clock to stable 	
 
-CLK_CRTCR = 0x04; //set the RTC clock to LSI clock and set the divider at 1 
+
 CLK_PCKENR2 |= (1 << 2);// enable rtc clock
 
 	//unlock the writing protection
@@ -61,7 +69,8 @@ CLK_PCKENR2 |= (1 << 2);// enable rtc clock
 	//set Hour format to 24 hour
 	// RTC_CR1 &= ~(1 << 6);
 	//Direct R/W on the TRs and DRs reg, By setting bit 4 (BYPSHAD) to 1
-#ifdef RTC_WAKEUP	
+#ifdef RTC_WAKEUP
+#warning "Using RTC wake up interrupt"
 	// Using 1 Minutes wake up interrupt for updating Display.
 	RTC_CR1 = 0x10 | 0x04;// Bypass shadown regs, 1Hz wake up clock.
 		
@@ -76,13 +85,19 @@ CLK_PCKENR2 |= (1 << 2);// enable rtc clock
 	// set the Prescalers regs
 	// Calculation fomular
 	// 1Hz clock (CK_spre) = RTCclock / (APRER + 1)(SPRER + 1)
+#ifdef LSI	
 	// In this case RTCclock is 38kHz. I use https://www.calculatorsoup.com/calculators/math/factors.php?input=38000&action=solve
 	// to find the suitable match of APRER and SPRER using Factorization method. 
 	
-	RTC_SPRERH = (uint8_t)(500 >> 8);
-	RTC_SPRERL = (uint8_t)(500);
-	RTC_APRER  = (uint8_t)(76);	
-	
+	RTC_SPRERH = (uint8_t)((304 - 1) >> 8);
+	RTC_SPRERL = (uint8_t)(304 - 1);
+	RTC_APRER  = (uint8_t)(125 - 1);	
+#else // 32768 Hz crystal
+	RTC_SPRERH = (0x0100 - 1) >> 8;
+	RTC_SPRERL = (uint8_t)(0x0100 - 1);
+	RTC_APRER =  (128 - 1);
+
+#endif
 	//exit init mode
 	RTC_ISR1 &= ~(1 << 7);
 
