@@ -3,8 +3,8 @@
 #define IMX316_SET_FILE_A_TOP_SIZE			169
 #define IMX316_SET_FILE_A_BOT_SIZE			48
 const static uint16_t global_setfile_a_reg[IMX316_GLOBAL_SET_FILE_ARRAY_SIZE] = {
-	0x1006,
-	0x1007,
+	0x1006,// MCLK
+	0x1007,// MCLK 
 	0x1000,
 	0x210F,
 	0x4053,
@@ -68,8 +68,8 @@ const static uint16_t global_setfile_a_reg[IMX316_GLOBAL_SET_FILE_ARRAY_SIZE] = 
 };
 
 const static uint8_t global_setfile_a_val[IMX316_GLOBAL_SET_FILE_ARRAY_SIZE] = {
-	0x1A,
-	0x00,
+	0x14,// MCLK 26MHz -> 0x1A, Now 0x14 (20MHz). IMX316 Default at 0x18 (24MHz)
+	0x00,// MCLK 
 	0x00,
 	0x00,
 	0x00,
@@ -603,7 +603,7 @@ const static uint8_t current_setting_setfile_a_val[IMX316_CURRENT_SETTING_ARRAY_
 	0xA3,
 	0x01,
 	0x00,
-	0x01
+	0x00 // 0x1001 Don't start streaming yet...
 };
 
 const static uint16_t setfile_a_top_reg[IMX316_SET_FILE_A_TOP_SIZE] = {
@@ -784,7 +784,7 @@ const static uint8_t setfile_a_top_val[IMX316_SET_FILE_A_TOP_SIZE] = {
 	0x8A,
 	0x03,
 	0x00,
-	0x8A,
+	0x8A,// 0x1049 VCSEL modulating Frequency
 	0x03,
 	0x04,
 	0xAC,
@@ -839,8 +839,8 @@ const static uint8_t setfile_a_top_val[IMX316_SET_FILE_A_TOP_SIZE] = {
 	0x00,
 	0x00,
 	0x00,
-	0x00,
-	0x00,
+	0xAA,// 0x2134 VCSEL ON/OFF
+	0xAA,// 0x2135 VCSEL ON/OFF
 	0x01,
 	0x00,
 	0x00,
