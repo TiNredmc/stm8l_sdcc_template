@@ -27,9 +27,9 @@
 
 // Change according to your battery capacity.
 // Calculation fomular
-// BAT_FULLCAP = Battery capacity (mAh) * sens resistor value (Ohm).
+// BAT_FULLCAP = Battery capacity (mAh) * sense resistor value (Ohm).
 // Example :
-// BAT_FULLCAP = 500 mAh * 0.010 Ohm <- This code has sens resistor fixed as 10mOhm
+// BAT_FULLCAP = 500 mAh * 0.010 Ohm <- This code has sense resistor fixed as 10mOhm
 // So BAT_FULLCAP = 5
 #define BAT_FULLCAP 1 // 100mAh battery
 
